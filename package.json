@@ -1,0 +1,84 @@
+{
+  "name": "github-pr-handler",
+  "displayName": "Github PR handler",
+  "description": "This is a Github Pull request extension which handles and reviews PRs",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.98.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onView:githubPRs",
+    "onCommand:github-prs.loadPullRequests"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "github-prs.loadPullRequests",
+        "title": "Load GitHub PRs"
+      },
+      {
+        "command": "github-pr-handler.testCommand",
+        "title": "Test Command"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "github-prs.loadPullRequests",
+          "when": "view == githubPRs",
+          "group": "navigation"
+        }
+      ]
+    },
+    "views": {
+      "explorer": [
+        {
+          "id": "githubPRs",
+          "name": "GitHub Pull Requests",
+          "icon": "resources/github-icon.svg"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "GitHub PR Extension",
+      "properties": {
+        "githubPRs.accessToken": {
+          "type": "string",
+          "description": "GitHub Personal Access Token"
+        },
+        "githubPRs.repo": {
+          "type": "string",
+          "description": "Repository (owner/repo-name)"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.10",
+    "@types/node": "20.x",
+    "@types/vscode": "^1.98.0",
+    "@typescript-eslint/eslint-plugin": "^8.28.0",
+    "@typescript-eslint/parser": "^8.28.0",
+    "@vscode/test-cli": "^0.0.10",
+    "@vscode/test-electron": "^2.4.1",
+    "eslint": "^9.23.0",
+    "typescript": "^5.8.2"
+  },
+  "dependencies": {
+    "@octokit/rest": "^18.12.0",
+    "@types/node-fetch": "^2.6.12",
+    "node-fetch": "^3.3.2"
+  }
+}
