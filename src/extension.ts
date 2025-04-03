@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
-import { getGitHubSession, getOctokit } from './auth'; // Adjust path
-import { PrDataProvider } from './prDataProvider'; // Adjust path
+import { getGitHubSession, getOctokit } from './auth'; 
+import { PrDataProvider } from './prDataProvider'; 
 import { Octokit } from '@octokit/rest';
 import type { PullRequestInfo } from './prDataProvider'; // Import the interface
 
