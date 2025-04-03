@@ -10,51 +10,61 @@
     "Other"
   ],
   "activationEvents": [
-    "onView:githubPRs",
-    "onCommand:github-prs.loadPullRequests"
+    "onView:yourPrViewId", 
+    "onCommand:yourExtension.createPullRequest", 
+    "onCommand:yourExtension.refreshPrView",
+    "onAuthenticationRequest:github" 
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "your-pr-activitybar",
+          "title": "Your PRs",
+          "icon": "$(git-pull-request)" 
+        }
+      ]
+    },
     "commands": [
       {
-        "command": "github-prs.loadPullRequests",
-        "title": "Load GitHub PRs"
+        "command": "yourExtension.createPullRequest",
+        "title": "Create GitHub Pull Request",
+        "category": "Your PR Extension"
       },
       {
-        "command": "github-pr-handler.testCommand",
-        "title": "Test Command"
+        "command": "yourExtension.refreshPrView",
+        "title": "Refresh Pull Request View",
+        "category": "Your PR Extension",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "yourExtension.viewPullRequest",
+        "title": "View Pull Request Details"
+      },
+      {
+        "command": "yourExtension.viewDiff",
+        "title": "View Pull Request Diff"
       }
     ],
     "menus": {
-      "view/title": [
-        {
-          "command": "github-prs.loadPullRequests",
-          "when": "view == githubPRs",
-          "group": "navigation"
-        }
-      ]
+      "view/title": [ 
+          {
+             "command": "yourExtension.refreshPrView",
+             "when": "view == yourPrViewId", 
+             "group": "navigation"
+          }
+       ]
     },
     "views": {
-      "explorer": [
+      "your-pr-activitybar": [
         {
-          "id": "githubPRs",
+          "id": "yourPrViewId", 
           "name": "GitHub Pull Requests",
-          "icon": "resources/github-icon.svg"
+          "icon": "$(git-pull-request)", 
+          "contextualTitle": "Your PRs"
         }
       ]
-    },
-    "configuration": {
-      "title": "GitHub PR Extension",
-      "properties": {
-        "githubPRs.accessToken": {
-          "type": "string",
-          "description": "GitHub Personal Access Token"
-        },
-        "githubPRs.repo": {
-          "type": "string",
-          "description": "Repository (owner/repo-name)"
-        }
-      }
     }
   },
   "scripts": {
@@ -62,8 +72,8 @@
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
-    "lint": "eslint src",
-    "test": "vscode-test"
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js"
   },
   "devDependencies": {
     "@types/mocha": "^10.0.10",
