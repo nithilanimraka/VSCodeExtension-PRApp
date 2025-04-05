@@ -10,10 +10,12 @@
     "Other"
   ],
   "activationEvents": [
-    "onView:yourPrViewId", 
-    "onCommand:yourExtension.createPullRequest", 
+    "onView:yourPrViewId",
+    "onCommand:yourExtension.createPullRequest",
     "onCommand:yourExtension.refreshPrView",
-    "onAuthenticationRequest:github" 
+    "onCommand:yourExtension.viewPullRequest", 
+    "onCommand:yourExtension.viewItemDiff",   
+    "onAuthenticationRequest:github"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -31,6 +33,11 @@
         "command": "yourExtension.createPullRequest",
         "title": "Create GitHub Pull Request",
         "category": "Your PR Extension"
+      },
+      {
+        "command": "yourExtension.viewItemDiff",
+        "title": "View Changes",
+        "icon": "$(diff)" 
       },
       {
         "command": "yourExtension.refreshPrView",
@@ -54,7 +61,19 @@
              "when": "view == yourPrViewId", 
              "group": "navigation"
           }
-       ]
+       ],
+       "view/item/context": [ 
+            {
+                "command": "yourExtension.viewItemDiff",
+                "when": "view == yourPrViewId && viewItem == pullRequestItem", 
+                "group": "inline" 
+            },
+            {
+                 "command": "yourExtension.viewItemDiff",
+                 "when": "view == yourPrViewId && viewItem == pullRequestItem",
+                 "group": "navigation@1" 
+            }
+        ]
     },
     "views": {
       "your-pr-activitybar": [

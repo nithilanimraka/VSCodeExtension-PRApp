@@ -189,22 +189,28 @@ class CategoryItem extends vscode.TreeItem {
     // You can add icons here using `iconPath`
 }
 
-class PullRequestItem extends vscode.TreeItem {
+export class PullRequestItem extends vscode.TreeItem { // Make sure to EXPORT if needed by command handler type check
     constructor(
         public readonly prInfo: PullRequestInfo,
-        public readonly collapsibleState: vscode.TreeItemCollapsibleState
+        // Usually PR items aren't expandable in this view
+        public readonly collapsibleState: vscode.TreeItemCollapsibleState = vscode.TreeItemCollapsibleState.None
     ) {
         super(`#${prInfo.number}: ${prInfo.title}`, collapsibleState);
+
         this.description = `by ${prInfo.author}`;
         this.tooltip = `${prInfo.title}\nAuthor: ${prInfo.author}\nClick to view details`;
-        // Command to execute when clicked
+
+        // Command to execute when the item itself is clicked (opens webview)
         this.command = {
             command: 'yourExtension.viewPullRequest', // Command defined in package.json
             title: 'View Pull Request Details',
             arguments: [this.prInfo] // Pass PR info to the command handler
         };
-        this.contextValue = 'pullRequest'; // For context menus later
-         // Optional: Icon based on PR state (open, merged, closed)
+
+        // **NEW: Set context value for menu contributions**
+        this.contextValue = 'pullRequestItem';
+
+        // Optional: Icon based on PR state (open, merged, closed)
         this.iconPath = new vscode.ThemeIcon('git-pull-request');
     }
 }
