@@ -6,6 +6,9 @@ import { Octokit } from '@octokit/rest'; // Import Octokit type
 import type { Endpoints } from "@octokit/types"; // Import types for response data
 import type { PullRequestInfo } from './prDataProvider';
 
+import * as fs from 'fs';
+import * as path from 'path';
+
 // --- Type Definitions for GitHub API Responses (can be expanded) ---
 type IssueComment = Endpoints["GET /repos/{owner}/{repo}/issues/{issue_number}/comments"]["response"]["data"][0];
 type ReviewComment = Endpoints["GET /repos/{owner}/{repo}/pulls/{pull_number}/comments"]["response"]["data"][0];
@@ -18,7 +21,8 @@ interface TimelineItemBase {
 }
 interface ReviewTimelineItem extends TimelineItemBase {
     type: 'review';
-    data: Review;
+    // Let's add the associated comments directly to the data payload for simplicity
+    data: Review & { associated_comments?: ReviewComment[] }; // Add associated_comments here
 }
 interface ReviewCommentTimelineItem extends TimelineItemBase {
     type: 'review_comment';
@@ -268,7 +272,31 @@ async function updateWebviewContent(context: vscode.ExtensionContext, webview: v
     if (activeWebview) {
         activeWebview.prInfo = prInfo;
     }
-     webview.html = await getWebviewTimelineHtml(context, webview, prInfo);
+
+    const generatedHtml = await getWebviewTimelineHtml(context, webview, prInfo);
+
+     // --- WRITE TO FILE ---
+    try {
+        // Ensure the global storage directory exists
+        // Note: Using fs promises API might require async/await if needed elsewhere
+        // For simplicity here, using synchronous check/create, assuming context.globalStorageUri is available
+        if (!fs.existsSync(context.globalStorageUri.fsPath)) {
+             fs.mkdirSync(context.globalStorageUri.fsPath, { recursive: true });
+         }
+
+        // Define the file path within the extension's global storage
+        const filePath = path.join(context.globalStorageUri.fsPath, `webview_debug_pr_${prInfo.number}.html`);
+        fs.writeFileSync(filePath, generatedHtml, 'utf8');
+        console.log(`DEBUG: Wrote generated HTML for PR ${prInfo.number} to: ${filePath}`);
+        // You can reveal this file in the explorer if desired:
+        // vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(filePath));
+    } catch (err) {
+        console.error("DEBUG: Error writing debug HTML file:", err);
+        vscode.window.showErrorMessage(`Failed to write debug HTML file: ${err}`);
+    }
+    // --- END WRITE TO FILE ---
+
+    webview.html = generatedHtml; // Assign the already generated HTML
 }
 
 // =================================
@@ -276,7 +304,7 @@ async function updateWebviewContent(context: vscode.ExtensionContext, webview: v
 // =================================
 async function fetchPrTimelineData(octokit: Octokit, prInfo: PullRequestInfo): Promise<TimelineItem[]> {
     try {
-        const owner = prInfo.repoOwner;
+           const owner = prInfo.repoOwner;
         const repo = prInfo.repoName;
         const pull_number = prInfo.number;
 
@@ -289,77 +317,110 @@ async function fetchPrTimelineData(octokit: Octokit, prInfo: PullRequestInfo): P
             octokit.pulls.listCommits({ owner, repo, pull_number, per_page: 100 })
         ]);
 
-        console.log("--- Raw Review Comments Data ---");
-        reviewCommentsResponse.data.forEach(comment => {
-            // Log bot comments or any comment missing body_html
-            if ((comment.user?.login === 'pr-respond-test[bot]') || !comment.body_html) {
-                console.log(`Review Comment #${comment.id} by ${comment.user?.login}`);
-                console.log(`  -> body_html: ${comment.body_html}`);
-                console.log(`  -> body: ${comment.body}`); // Log body content separately
-                // console.log(comment); // Optional: Log the whole object
-            }
-        });
-        console.log("--- Raw Issue Comments Data ---");
-        issueCommentsResponse.data.forEach(comment => {
-             // Log bot comments or any comment missing body_html
-             if ((comment.user?.login === 'pr-respond-test[bot]') || !comment.body_html) {
-                console.log(`Issue Comment #${comment.id} by ${comment.user?.login}`);
-                console.log(`  -> body_html: ${comment.body_html}`);
-                console.log(`  -> body: ${comment.body}`); // Log body content separately
-                // console.log(comment); // Optional: Log the whole object
-             }
-        });
+        
 
+        // reviewsResponse.data.forEach(comment => {
+        //     // Log bot comments or any comment missing body_html
+        //     console.log("--------REVIEW RESPONSE STARTS--------");
+
+        //     console.log(`Review Comment #${comment.id} by ${comment.user?.login}`);
+        //     console.log(`  -> body_html: ${comment.body_html}`);
+        //     console.log(`  -> body: ${comment.body}`); // Log body content separately
+        //     // console.log(comment); // Optional: Log the whole object
+
+        //     console.log("--------REVIEW RESPONSE ENDS--------");
+
+        // });
+
+
+        // console.log("--- Raw Review Comments Data ---");
+        // reviewCommentsResponse.data.forEach(comment => {
+        //     // Log bot comments or any comment missing body_html
+        //     if ((comment.user?.login === 'pr-respond-test[bot]') || !comment.body_html) {
+        //         console.log(`Review Comment #${comment.id} by ${comment.user?.login}`);
+        //         console.log(`  -> body_html: ${comment.body_html}`);
+        //         console.log(`  -> body: ${comment.body}`); // Log body content separately
+        //         // console.log(comment); // Optional: Log the whole object
+        //     }
+        // });
+        // console.log("--- Raw Issue Comments Data ---");
+        // issueCommentsResponse.data.forEach(comment => {
+        //      // Log bot comments or any comment missing body_html
+        //      if ((comment.user?.login === 'pr-respond-test[bot]') || !comment.body_html) {
+        //         console.log(`Issue Comment #${comment.id} by ${comment.user?.login}`);
+        //         console.log(`  -> body_html: ${comment.body_html}`);
+        //         console.log(`  -> body: ${comment.body}`); // Log body content separately
+        //         // console.log(comment); // Optional: Log the whole object
+        //      }
+        // });
+
+        // --- 1. Create a Map of Review Comments by Review ID ---
+        const commentsByReviewId = new Map<number, ReviewComment[]>();
+        reviewCommentsResponse.data.forEach(comment => {
+            if (comment.pull_request_review_id) {
+                const comments = commentsByReviewId.get(comment.pull_request_review_id) || [];
+                comments.push(comment);
+                // Sort comments within a review by creation time? Optional.
+                // comments.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+                commentsByReviewId.set(comment.pull_request_review_id, comments);
+            }
+            // We could potentially handle comments without a review_id here if needed,
+            // but they shouldn't normally occur from this endpoint.
+        });
+        console.log(`Mapped ${commentsByReviewId.size} reviews with associated comments.`);
+
+
+        // --- 2. Initialize Timeline Items ---
         let timelineItems: TimelineItem[] = [];
 
-        // Process and add items with type and timestamp
-        reviewsResponse.data.forEach(item => {
+        // --- 3. Process Reviews and Attach Comments ---
+        reviewsResponse.data.forEach(review => {
             // Filter out 'PENDING' reviews unless you want to show them
-             if (item.state !== 'PENDING' && item.submitted_at) {
-                timelineItems.push({ type: 'review', data: item, timestamp: new Date(item.submitted_at) });
+             if (review.state !== 'PENDING' && review.submitted_at) {
+                 // Find associated comments from the map
+                 const associated_comments = commentsByReviewId.get(review.id) || [];
+                 if(associated_comments.length > 0) {
+                     console.log(`Attaching ${associated_comments.length} comments to review ${review.id}`);
+                 }
+                 // Add the review submission, INCLUDING the associated comments in its data
+                 timelineItems.push({
+                     type: 'review',
+                     // Cast review to include the optional property
+                     data: { ...review, associated_comments: associated_comments },
+                     timestamp: new Date(review.submitted_at)
+                 });
              }
         });
+
+        // --- 4. Process Other Timeline Items (Review Comments, Issue Comments, Commits) ---
+        // Add standalone review comments (these should ideally be filtered later)
         reviewCommentsResponse.data.forEach(item => timelineItems.push({ type: 'review_comment', data: item, timestamp: new Date(item.created_at) }));
+        // Add issue comments
         issueCommentsResponse.data.forEach(item => timelineItems.push({ type: 'issue_comment', data: item, timestamp: new Date(item.created_at) }));
+        // Add commits
         commitsResponse.data.forEach(item => {
-             if(item.commit.author?.date) { // Ensure commit date exists
+             if(item.commit.author?.date) {
                  timelineItems.push({ type: 'commit', data: item, timestamp: new Date(item.commit.author.date) })
              }
         });
 
 
-        // --- Sophisticated Grouping (Example - group comments under reviews) ---
-        // Create map of comments by review ID
-        const commentsByReviewId = new Map<number, ReviewComment[]>();
-        reviewCommentsResponse.data.forEach(comment => {
-            if (comment.pull_request_review_id) {
-                let comments = commentsByReviewId.get(comment.pull_request_review_id) || [];
-                comments.push(comment);
-                commentsByReviewId.set(comment.pull_request_review_id, comments);
-            }
-        });
 
-        // Add comments to their review items
-         timelineItems = timelineItems.map(item => {
-             if (item.type === 'review' && commentsByReviewId.has(item.data.id)) {
-                 // Add comments directly to the review data or handle in rendering
-                 // For simplicity here, we'll rely on filtering out standalone comments below
-             }
-             return item;
-         });
-
-
+        // --- 5. Re-enable the Filter ---
         // Filter out standalone review comments that BELONG to a fetched review submission
-        //  const submittedReviewIds = new Set(reviewsResponse.data.map(r => r.id));
-        //  timelineItems = timelineItems.filter(item =>
-        //      !(item.type === 'review_comment' && item.data.pull_request_review_id && submittedReviewIds.has(item.data.pull_request_review_id))
-        //  );
+        // (because we will render them *within* the review submission item)
+        const submittedReviewIds = new Set(reviewsResponse.data.map(r => r.id));
+        const originalCount = timelineItems.length; // For logging
+        timelineItems = timelineItems.filter(item =>
+            !(item.type === 'review_comment' && item.data.pull_request_review_id && submittedReviewIds.has(item.data.pull_request_review_id))
+        );
+        console.log(`Filtered out ${originalCount - timelineItems.length} standalone review comments associated with fetched reviews.`);
 
 
-        // Sort the final timeline
+        // --- 6. Sort the Final Timeline ---
         timelineItems.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
 
-        console.log(`Workspaceed ${timelineItems.length} timeline items for PR #${pull_number}`);
+        console.log(`Processed ${timelineItems.length} final timeline items for PR #${pull_number}`);
         return timelineItems;
 
     } catch (e) {
@@ -536,23 +597,85 @@ async function getWebviewTimelineHtml(context: vscode.ExtensionContext, webview:
                     }
                 }
 
-                 // --- HTML Generation Functions (REVISED with null checks and correct body_html usage) ---
+                // --- NEW: Helper to generate HTML for a single comment's body ---
+                 // This reuses the fallback logic
+                 function generateCommentBodyHtml(comment) {
+                    let commentBodyContent = '';
+                    if (comment.body_html && comment.body_html.trim() !== '') {
+                        commentBodyContent = comment.body_html; // Use HTML version if available
+                    } else if (comment.body && comment.body.trim() !== '') {
+                        // Fallback to raw body: Escape it and wrap in <pre>
+                        // console.log(\`Falling back to comment.body for comment #\${comment.id}\`); // Optional log
+                        commentBodyContent = \`<pre style="white-space: pre-wrap; word-wrap: break-word;">\${escapeHtml(comment.body)}</pre>\`;
+                    }
+                    return commentBodyContent ? \`<div class="comment-body">\${commentBodyContent}</div>\` : '';
+                 }
+
+                // --- NEW: Helper to generate HTML for a single review comment (used for nesting) ---
+                // Simplified version of generateReviewCommentHtml, focusing on the comment itself
+                function generateNestedReviewCommentHtml(comment) {
+                    const user = comment.user;
+                    const createdAt = comment.created_at ? new Date(comment.created_at).toLocaleString() : '';
+                    // Generate diff hunk if present
+                    const diffHunkHtml = (comment.diff_hunk && comment.diff_hunk.trim() !== '') ? \`<div class="diff-hunk"><pre><code>\${escapeHtml(comment.diff_hunk)}</code></pre></div>\` : '';
+                    // Generate comment body using the helper
+                    const commentBody = generateCommentBodyHtml(comment);
+
+                    // Don't render if there's no body *and* no diff hunk (rare)
+                    if (!commentBody && !diffHunkHtml) return '';
+
+                    return \`<div class="timeline-item nested-review-comment-item" style="margin-left: 20px; margin-top: 10px; border-top: 1px dashed var(--vscode-editorWidget-border, #666); padding-top: 10px;">
+                                <div class="item-header" style="font-size: 0.95em;">
+                                     \${user ? \`<img class="avatar" src="\${user.avatar_url || ''}" alt="\${escapeHtml(user.login || '')}" width="18" height="18">\`: '<span class="avatar-placeholder" style="width:18px; height:18px;"></span>'}
+                                    <strong class="author">\${escapeHtml(user?.login || 'unknown user')}</strong> commented on
+                                    \${comment.path ? \`<span class="file-path" style="font-size: 0.9em;">\${escapeHtml(comment.path)}</span>\` : ''}
+                                    \${comment.html_url ? \`<a class="gh-link" href="\${comment.html_url}" title="View comment on GitHub" target="_blank">🔗</a>\` : ''}
+                                    <span class="timestamp" style="font-size: 0.9em;">\${createdAt}</span>
+                                </div>
+                                \${diffHunkHtml}
+                                \${commentBody}
+                            </div>\`;
+                } 
+                 
+
+                // --- HTML Generation Functions (REVISED with null checks and correct body_html usage) ---
                 function generateReviewHtml(review) {
+                    const associatedComments = review.associated_comments || [];
+
                     const stateFormatted = formatReviewState(review.state);
                     const stateClass = review.state?.toLowerCase() || 'commented';
                     const user = review.user; // Check if user exists
                     const submittedAt = review.submitted_at ? new Date(review.submitted_at).toLocaleString() : '';
-                    const reviewBodyHtml = (review.body_html && review.body_html.trim() !== '') ? \`<div class="comment-body">\${review.body_html}</div>\` : '';
+                    // Use the helper for the main review body
+                    const reviewBody = generateCommentBodyHtml(review); 
+
+                    // --- Check if we should render this item ---
+                    // Render if it has a body OR a non-comment state OR associated comments
+                    const hasMeaningfulState = review.state && review.state !== 'COMMENTED'; // e.g., APPROVED, CHANGES_REQUESTED
+                    if (!reviewBody && !hasMeaningfulState && associatedComments.length === 0) {
+                         console.log(\`Skipping review submission #\${review.id} as it's empty and has no comments.\`);
+                         return ''; // Don't render purely empty 'COMMENTED' reviews
+                    }
+                    // --- End Check ---
+
+
+                    // --- Generate HTML for associated comments ---
+                    let commentsHtml = '';
+                    if (associatedComments.length > 0) {
+                        commentsHtml = associatedComments.map(comment => generateNestedReviewCommentHtml(comment)).join('');
+                    }
+                    // --- End generating comments HTML ---
 
                     return \`<div class="timeline-item review-submission-item">
                                 <div class="item-header">
                                     \${user ? \`<img class="avatar" src="\${user.avatar_url || ''}" alt="\${escapeHtml(user.login || '')}" width="20" height="20">\`: '<span class="avatar-placeholder"></span>'}
                                     <strong class="author">\${escapeHtml(user?.login || 'unknown user')}</strong>
                                     <span class="review-state \${stateClass}">\${stateFormatted}</span>
-                                    \${review.html_url ? \`<a class="gh-link" href="\${review.html_url}" title="View on GitHub" target="_blank">🔗</a>\` : ''}
-                                    <span class="timestamp">\${submittedAt}</span>
+                                    \${review.html_url ? \`<a class="gh-link" href="\${review.html_url}" title="View review on GitHub" target="_blank">🔗</a>\` : ''}
+                                    <span class="timestamp">$\{submittedAt}</span>
                                 </div>
-                                \${reviewBodyHtml} 
+                                \${reviewBody}
+                                \${commentsHtml} {/* <-- Insert the generated comments HTML here */}
                             </div>\`;
                 }
 
@@ -561,19 +684,11 @@ async function getWebviewTimelineHtml(context: vscode.ExtensionContext, webview:
                     const createdAt = comment.created_at ? new Date(comment.created_at).toLocaleString() : '';
                     const diffHunkHtml = (comment.diff_hunk && comment.diff_hunk.trim() !== '') ? \`<div class="diff-hunk"><pre><code>\${escapeHtml(comment.diff_hunk)}</code></pre></div>\` : ''; // Diff hunk IS plain text, escape it
                     
-                    // --- MODIFICATION START ---
-                    let commentBodyContent = '';
-                    if (comment.body_html && comment.body_html.trim() !== '') {
-                        commentBodyContent = comment.body_html; // Use HTML version if available
-                    } else if (comment.body && comment.body.trim() !== '') {
-                        // Fallback to raw body: Escape it and wrap in <pre> for formatting
-                        console.log(\`Falling back to comment.body for comment #\${comment.id}\`); // Optional: log fallback
-                        commentBodyContent = \`<pre style="white-space: pre-wrap; word-wrap: break-word;">\${escapeHtml(comment.body)}</pre>\`;
-                    }
-                    // --- MODIFICATION END ---
-                    
-                    // Use the determined content (This line MUST be here)
-                    const commentBodyHtml = commentBodyContent ? \`<div class="comment-body">\${commentBodyContent}</div>\` : '';
+                    // Use the helper for the comment body
+                    const commentBody = generateCommentBodyHtml(comment); // Use helper here
+
+                     // Don't render if no body and no diff hunk
+                     if (!commentBody && !diffHunkHtml) return '';
 
                     return \`<div class="timeline-item review-comment-item">
                                 <div class="item-header">
@@ -584,27 +699,18 @@ async function getWebviewTimelineHtml(context: vscode.ExtensionContext, webview:
                                     <span class="timestamp">\${createdAt}</span>
                                 </div>
                                 \${diffHunkHtml}
-                                \${commentBodyHtml}
+                                \${commentBody}
                             </div>\`;
                 }
 
                 function generateIssueCommentHtml(comment) {
                      const user = comment.user;
                      const createdAt = comment.created_at ? new Date(comment.created_at).toLocaleString() : '';
+                     // Use the helper for the comment body
+                     const commentBody = generateCommentBodyHtml(comment); // Use helper here
 
-                    // --- MODIFICATION LOGIC ---
-                    let commentBodyContent = '';
-                    if (comment.body_html && comment.body_html.trim() !== '') {
-                        commentBodyContent = comment.body_html; // Use HTML version if available
-                    } else if (comment.body && comment.body.trim() !== '') {
-                        // Fallback to raw body: Escape it and wrap in <pre> for formatting
-                        console.log(\`Falling back to comment.body for comment #\${comment.id}\`); // Optional: log fallback
-                        commentBodyContent = \`<pre style="white-space: pre-wrap; word-wrap: break-word;">\${escapeHtml(comment.body)}</pre>\`;
-                    }
-                    // --- END MODIFICATION LOGIC ---
-
-                    // Use the determined content (This line MUST be here)
-                    const commentBodyHtml = commentBodyContent ? \`<div class="comment-body">\${commentBodyContent}</div>\` : '';
+                     // Don't render if no body
+                     if (!commentBody) return '';
 
                     return \`<div class="timeline-item issue-comment-item">
                                 <div class="item-header">
@@ -613,7 +719,7 @@ async function getWebviewTimelineHtml(context: vscode.ExtensionContext, webview:
                                     \${comment.html_url ? \`<a class="gh-link" href="\${comment.html_url}" title="View on GitHub" target="_blank">🔗</a>\` : ''}
                                     <span class="timestamp">\${createdAt}</span>
                                 </div>
-                                \${commentBodyHtml}
+                                \${commentBody}
                             </div>\`;
                 }
 
