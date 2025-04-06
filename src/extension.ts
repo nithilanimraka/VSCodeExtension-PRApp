@@ -289,24 +289,26 @@ async function fetchPrTimelineData(octokit: Octokit, prInfo: PullRequestInfo): P
             octokit.pulls.listCommits({ owner, repo, pull_number, per_page: 100 })
         ]);
 
-        // *** ADD LOGGING HERE ***
         console.log("--- Raw Review Comments Data ---");
         reviewCommentsResponse.data.forEach(comment => {
-            if (!comment.user || comment.user.login === 'pr-respond-test[bot]') { // Log bot comments AND comments with no user? Adjust as needed
-                // CORRECTED LOGGING: Use backticks and ensure properties exist
-                console.log(`Review Comment #${comment.id} by <span class="math-inline">\{comment\.user?\.login\}\: body\='</span>{comment.body}', body_html='${comment.body_html}'`);
-                // console.log(comment); // Log the whole object if needed for more detail
+            // Log bot comments or any comment missing body_html
+            if ((comment.user?.login === 'pr-respond-test[bot]') || !comment.body_html) {
+                console.log(`Review Comment #${comment.id} by ${comment.user?.login}`);
+                console.log(`  -> body_html: ${comment.body_html}`);
+                console.log(`  -> body: ${comment.body}`); // Log body content separately
+                // console.log(comment); // Optional: Log the whole object
             }
         });
         console.log("--- Raw Issue Comments Data ---");
         issueCommentsResponse.data.forEach(comment => {
-            if (!comment.user || comment.user.login === 'pr-respond-test[bot]') {
-                // CORRECTED LOGGING: Use backticks and ensure properties exist
-                console.log(`Issue Comment #${comment.id} by <span class="math-inline">\{comment\.user?\.login\}\: body\='</span>{comment.body}', body_html='${comment.body_html}'`);
-                // console.log(comment); // Log the whole object if needed for more detail
-            }
+             // Log bot comments or any comment missing body_html
+             if ((comment.user?.login === 'pr-respond-test[bot]') || !comment.body_html) {
+                console.log(`Issue Comment #${comment.id} by ${comment.user?.login}`);
+                console.log(`  -> body_html: ${comment.body_html}`);
+                console.log(`  -> body: ${comment.body}`); // Log body content separately
+                // console.log(comment); // Optional: Log the whole object
+             }
         });
-        // *** END LOGGING **
 
         let timelineItems: TimelineItem[] = [];
 
@@ -348,10 +350,10 @@ async function fetchPrTimelineData(octokit: Octokit, prInfo: PullRequestInfo): P
 
 
         // Filter out standalone review comments that BELONG to a fetched review submission
-         const submittedReviewIds = new Set(reviewsResponse.data.map(r => r.id));
-         timelineItems = timelineItems.filter(item =>
-             !(item.type === 'review_comment' && item.data.pull_request_review_id && submittedReviewIds.has(item.data.pull_request_review_id))
-         );
+        //  const submittedReviewIds = new Set(reviewsResponse.data.map(r => r.id));
+        //  timelineItems = timelineItems.filter(item =>
+        //      !(item.type === 'review_comment' && item.data.pull_request_review_id && submittedReviewIds.has(item.data.pull_request_review_id))
+        //  );
 
 
         // Sort the final timeline
