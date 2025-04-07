@@ -13,8 +13,8 @@
     "onView:yourPrViewId",
     "onCommand:yourExtension.createPullRequest",
     "onCommand:yourExtension.refreshPrView",
-    "onCommand:yourExtension.viewPullRequest", 
-    "onCommand:yourExtension.viewItemDiff",   
+    "onCommand:yourExtension.viewPullRequest",
+    "onCommand:yourExtension.viewItemDiff",
     "onAuthenticationRequest:github"
   ],
   "main": "./out/extension.js",
@@ -24,7 +24,7 @@
         {
           "id": "your-pr-activitybar",
           "title": "Your PRs",
-          "icon": "$(git-pull-request)" 
+          "icon": "$(git-pull-request)"
         }
       ]
     },
@@ -37,7 +37,7 @@
       {
         "command": "yourExtension.viewItemDiff",
         "title": "View Changes",
-        "icon": "$(diff)" 
+        "icon": "$(diff)"
       },
       {
         "command": "yourExtension.refreshPrView",
@@ -55,32 +55,32 @@
       }
     ],
     "menus": {
-      "view/title": [ 
-          {
-             "command": "yourExtension.refreshPrView",
-             "when": "view == yourPrViewId", 
-             "group": "navigation"
-          }
-       ],
-       "view/item/context": [ 
-            {
-                "command": "yourExtension.viewItemDiff",
-                "when": "view == yourPrViewId && viewItem == pullRequestItem", 
-                "group": "inline" 
-            },
-            {
-                 "command": "yourExtension.viewItemDiff",
-                 "when": "view == yourPrViewId && viewItem == pullRequestItem",
-                 "group": "navigation@1" 
-            }
-        ]
+      "view/title": [
+        {
+          "command": "yourExtension.refreshPrView",
+          "when": "view == yourPrViewId",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "yourExtension.viewItemDiff",
+          "when": "view == yourPrViewId && viewItem == pullRequestItem",
+          "group": "inline"
+        },
+        {
+          "command": "yourExtension.viewItemDiff",
+          "when": "view == yourPrViewId && viewItem == pullRequestItem",
+          "group": "navigation@1"
+        }
+      ]
     },
     "views": {
       "your-pr-activitybar": [
         {
-          "id": "yourPrViewId", 
+          "id": "yourPrViewId",
           "name": "GitHub Pull Requests",
-          "icon": "$(git-pull-request)", 
+          "icon": "$(git-pull-request)",
           "contextualTitle": "Your PRs"
         }
       ]
@@ -107,7 +107,9 @@
   },
   "dependencies": {
     "@octokit/rest": "^18.12.0",
+    "@types/markdown-it": "^14.1.2",
     "@types/node-fetch": "^2.6.12",
+    "markdown-it": "^14.1.0",
     "node-fetch": "^3.3.2"
   }
 }

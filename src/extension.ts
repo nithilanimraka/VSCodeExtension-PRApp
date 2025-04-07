@@ -282,7 +282,7 @@ async function updateWebviewContent(context: vscode.ExtensionContext, webview: v
         // For simplicity here, using synchronous check/create, assuming context.globalStorageUri is available
         if (!fs.existsSync(context.globalStorageUri.fsPath)) {
              fs.mkdirSync(context.globalStorageUri.fsPath, { recursive: true });
-         }
+        }
 
         // Define the file path within the extension's global storage
         const filePath = path.join(context.globalStorageUri.fsPath, `webview_debug_pr_${prInfo.number}.html`);
@@ -527,11 +527,54 @@ async function getWebviewTimelineHtml(context: vscode.ExtensionContext, webview:
             /* Diff Hunk Specific */
             .diff-hunk { border: 1px solid var(--vscode-editorWidget-border, #ccc); border-radius: 4px; margin-bottom: 8px; overflow-x: auto; }
             .diff-hunk pre { margin: 0; padding: 0; background-color: var(--vscode-editor-background); border-radius: 4px; }
-             /* Diff line styling */
-             .diff-hunk code span { display: block; padding: 0 10px; border-left: 3px solid transparent; font-family: var(--vscode-editor-font-family); font-size: var(--vscode-editor-font-size); white-space: pre; }
-             .diff-hunk code span.addition { background-color: rgba(47, 131, 47, 0.15); border-left-color: var(--vscode-gitDecoration-addedResourceForeground); }
-             .diff-hunk code span.deletion { background-color: rgba(188, 76, 0, 0.15); border-left-color: var(--vscode-gitDecoration-deletedResourceForeground); }
-             .diff-hunk code span.hunk-header { color: var(--vscode-descriptionForeground); background-color: var(--vscode-textBlockQuote-background); padding: 2px 10px; font-style: italic; border-left: none; }
+            /* Diff line styling */
+            .diff-hunk code span { display: block; padding: 0 10px; border-left: 3px solid transparent; font-family: var(--vscode-editor-font-family); font-size: var(--vscode-editor-font-size); white-space: pre; }
+             
+            .diff-hunk .line { 
+                display: flex; 
+                white-space: nowrap;
+                margin: 0; /* Reset margin */
+                padding: 0; /* Reset padding */
+            } 
+            .diff-hunk .line-num {
+                /* display: inline-block; */ /* Remove this - let it be a flex item */
+                flex-shrink: 0; /* Prevent line number column from shrinking */
+                width: 45px; /* Maybe slightly wider for 3 digits? */
+                padding-right: 10px;
+                text-align: right;
+                opacity: 0.7;
+                user-select: none;
+                color: var(--vscode-editorLineNumber-foreground);
+                /* Match font of code for better vertical alignment */
+                font-family: var(--vscode-editor-font-family);
+                font-size: var(--vscode-editor-font-size); /* Match font size */
+                line-height: var(--vscode-editor-line-height); /* Match editor line height */
+                margin: 0;
+                padding: 0 10px 0 0; /* Adjust padding */
+            }
+            /* Style hunk header line number cell */
+             .diff-hunk .line.hunk-header .line-num {
+                 opacity: 0.5; /* Make it dimmer */
+             }
+            /* Ensure content part takes remaining space */
+            .diff-hunk .line-content { 
+                flex-grow: 1;
+                white-space: pre;
+                font-family: var(--vscode-editor-font-family);
+                font-size: var(--vscode-editor-font-size);
+                /* Add these: */
+                line-height: var(--vscode-editor-line-height); /* Match editor line height */
+                margin: 0;
+                padding-top: 0;    /* Remove potential default padding */
+                padding-bottom: 0;
+                /* Padding-left/border is handled by type */
+            }
+            
+            /* Adjust padding/border styles for line-content */
+            .diff-hunk .line-content.addition { background-color: rgba(47, 131, 47, 0.15); border-left: 3px solid var(--vscode-gitDecoration-addedResourceForeground); padding-left: 10px; }
+            .diff-hunk .line-content.deletion { background-color: rgba(188, 76, 0, 0.15); border-left: 3px solid var(--vscode-gitDecoration-deletedResourceForeground); padding-left: 10px; }
+            .diff-hunk .line-content.hunk-header { color: var(--vscode-descriptionForeground); background-color: var(--vscode-textBlockQuote-background); padding: 2px 10px; font-style: italic; border-left: none; } /* Reset border */
+            .diff-hunk .line-content.context { border-left: 3px solid transparent; padding-left: 10px; }
 
             /* Comment Body */
             .comment-body { padding: 5px 0; margin-left: 28px; /* Indent body relative to avatar */ margin-top: -5px; line-height: 1.4; }
@@ -613,69 +656,181 @@ async function getWebviewTimelineHtml(context: vscode.ExtensionContext, webview:
 
                 // --- NEW: Helper to generate HTML for a single review comment (used for nesting) ---
                 // Simplified version of generateReviewCommentHtml, focusing on the comment itself
+                
                 function generateNestedReviewCommentHtml(comment) {
                     const user = comment.user;
                     const createdAt = comment.created_at ? new Date(comment.created_at).toLocaleString() : '';
-                    // Generate diff hunk if present
-                    const diffHunkHtml = (comment.diff_hunk && comment.diff_hunk.trim() !== '') ? \`<div class="diff-hunk"><pre><code>\${escapeHtml(comment.diff_hunk)}</code></pre></div>\` : '';
-                    // Generate comment body using the helper
-                    const commentBody = generateCommentBodyHtml(comment);
+                    const commentBody = generateCommentBodyHtml(comment); // Assumes helper exists
 
-                    // Don't render if there's no body *and* no diff hunk (rare)
-                    if (!commentBody && !diffHunkHtml) return '';
+                    let filteredHunkHtml = '';
+                    const diffHunk = comment.diff_hunk;
+                    const commentEndLine = (typeof comment.line === 'number') ? comment.line : null;
+                    const commentStartLine = (typeof comment.start_line === 'number') ? comment.start_line : commentEndLine; // Default start=end
+
+                    // Determine if it's a single line comment for context adjustment
+                    const isSingleLineComment = (commentStartLine === commentEndLine);
+                    const CONTEXT_LINES_BEFORE = 3; // How many lines before to show for single-line comments
+
+                    if (diffHunk && commentEndLine !== null && commentStartLine !== null) {
+                        const lines = diffHunk.split('\\n');
+                        let styledLinesHtml = '';
+                        let currentFileLineNum = -1;
+                        let hunkHeaderFound = false;
+                        let parseError = false;
+                        let hunkStartLine = -1; // Store the actual start line of the hunk
+
+                        for (const line of lines) {
+                            if (parseError) break;
+
+                            const trimmedLine = line.trim();
+                            let lineClass = '';
+                            let displayLineNum = '';
+                            let fileLineNumForThisLine = -1;
+
+                            if (trimmedLine.startsWith('@@') && !hunkHeaderFound) {
+                                hunkHeaderFound = true;
+                                lineClass = 'hunk-header';
+                                const match = trimmedLine.match(/^@@ -\\d+(?:,\\d+)? \\+(\\d+)(?:,\\d+)? @@/);
+                                if (match && match[1]) {
+                                    hunkStartLine = parseInt(match[1], 10); // Store hunk start line
+                                    currentFileLineNum = hunkStartLine;
+                                    displayLineNum = '...';
+                                } else {
+                                    console.error(\`FAILED to parse hunk header: "\${trimmedLine}"\`);
+                                    parseError = true;
+                                    styledLinesHtml = \`<span>Error parsing diff hunk header.</span>\`;
+                                }
+                                continue;
+                            }
+
+                            if (!hunkHeaderFound || currentFileLineNum === -1) continue;
+
+                            // Determine line type and calculate file line number *for this line*
+                            if (trimmedLine.startsWith('+')) {
+                                lineClass = 'addition';
+                                fileLineNumForThisLine = currentFileLineNum;
+                                currentFileLineNum++;
+                            } else if (trimmedLine.startsWith('-')) {
+                                lineClass = 'deletion';
+                                fileLineNumForThisLine = -1; // No corresponding file line number in the 'new' file
+                            } else { // Context or empty line
+                                lineClass = 'context';
+                                if (line.length > 0) {
+                                     fileLineNumForThisLine = currentFileLineNum;
+                                     currentFileLineNum++;
+                                } else {
+                                     fileLineNumForThisLine = -1; // Don't number or filter empty lines based on range
+                                }
+                            }
+
+                            // --- MODIFIED Filter Logic ---
+                            let keepLine = false;
+                            // Keep Add(+) or Context( ) lines based on calculated file line number
+                            if (fileLineNumForThisLine !== -1 && (lineClass === 'addition' || lineClass === 'context')) {
+                                if (isSingleLineComment) {
+                                    // For single lines, show line L and up to CONTEXT_LINES_BEFORE
+                                    // Ensure lower bound doesn't go below actual hunk start
+                                    const lowerBound = Math.max(hunkStartLine, commentEndLine - CONTEXT_LINES_BEFORE);
+                                    if (fileLineNumForThisLine >= lowerBound && fileLineNumForThisLine <= commentEndLine) {
+                                        keepLine = true;
+                                    }
+                                } else {
+                                    // For multi-lines, show the exact range S to L
+                                    if (fileLineNumForThisLine >= commentStartLine && fileLineNumForThisLine <= commentEndLine) {
+                                        keepLine = true;
+                                    }
+                                }
+                            }
+                            // Note: Still filtering out '-' lines from the snippet for simplicity
+
+                            if (keepLine) {
+                                displayLineNum = String(fileLineNumForThisLine); // Use the calculated file line number
+                                const escapedLine = escapeHtml(line);
+                                styledLinesHtml += \`<span class="line \${lineClass}">\` +
+                                                       \`<span class="line-num">\${displayLineNum}</span>\` +
+                                                       \`<span class="line-content \${lineClass}">\${escapedLine}</span>\` +
+                                                   \`</span>\`; // No trailing \\n
+                            }
+                        } // End for loop
+
+                        if (styledLinesHtml && !parseError) {
+                           filteredHunkHtml = \`<div class="diff-hunk"><pre><code>\${styledLinesHtml}</code></pre></div>\`;
+                        } else if (parseError) {
+                            filteredHunkHtml = \`<div class="diff-hunk"><pre><code>\${styledLinesHtml}</code></pre></div>\`;
+                        }
+
+                    } // End if(diffHunk...)
+
+                    if (!commentBody && !filteredHunkHtml) return '';
+
+                    let lineRangeString = '';
+                    if (commentStartLine !== null && commentEndLine !== null && commentStartLine !== commentEndLine) {
+                        lineRangeString = \`<span class="line-range"> lines \${commentStartLine} to \${commentEndLine}</span>\`;
+                    } else if (commentEndLine !== null) {
+                        lineRangeString = \`<span class="line-range"> line \${commentEndLine}</span>\`;
+                    }
 
                     return \`<div class="timeline-item nested-review-comment-item" style="margin-left: 20px; margin-top: 10px; border-top: 1px dashed var(--vscode-editorWidget-border, #666); padding-top: 10px;">
                                 <div class="item-header" style="font-size: 0.95em;">
-                                     \${user ? \`<img class="avatar" src="\${user.avatar_url || ''}" alt="\${escapeHtml(user.login || '')}" width="18" height="18">\`: '<span class="avatar-placeholder" style="width:18px; height:18px;"></span>'}
+                                     \${user ? \`<img class="avatar" src="\${user.avatar_url || ''}" alt="\${escapeHtml(user?.login || 'unknown user')}" width="18" height="18">\`: '<span class="avatar-placeholder" style="width:18px; height:18px;"></span>'}
                                     <strong class="author">\${escapeHtml(user?.login || 'unknown user')}</strong> commented on
                                     \${comment.path ? \`<span class="file-path" style="font-size: 0.9em;">\${escapeHtml(comment.path)}</span>\` : ''}
+                                    \${lineRangeString}
                                     \${comment.html_url ? \`<a class="gh-link" href="\${comment.html_url}" title="View comment on GitHub" target="_blank">🔗</a>\` : ''}
                                     <span class="timestamp" style="font-size: 0.9em;">\${createdAt}</span>
                                 </div>
-                                \${diffHunkHtml}
+                                \${filteredHunkHtml}
                                 \${commentBody}
                             </div>\`;
-                } 
+                }
                  
 
                 // --- HTML Generation Functions (REVISED with null checks and correct body_html usage) ---
                 function generateReviewHtml(review) {
-                    const associatedComments = review.associated_comments || [];
+                    // 'review' object might contain 'associated_comments' array from fetchPrTimelineData
 
+                    const associatedComments = review.associated_comments || []; // Get attached comments or empty array
+
+                    // --- Basic Review Info ---
                     const stateFormatted = formatReviewState(review.state);
                     const stateClass = review.state?.toLowerCase() || 'commented';
-                    const user = review.user; // Check if user exists
+                    const user = review.user;
                     const submittedAt = review.submitted_at ? new Date(review.submitted_at).toLocaleString() : '';
-                    // Use the helper for the main review body
-                    const reviewBody = generateCommentBodyHtml(review); 
 
-                    // --- Check if we should render this item ---
-                    // Render if it has a body OR a non-comment state OR associated comments
-                    const hasMeaningfulState = review.state && review.state !== 'COMMENTED'; // e.g., APPROVED, CHANGES_REQUESTED
+                    // --- Generate Body & Check if Renderable ---
+                    // Use the helper for the main review submission body (handles fallback)
+                    const reviewBody = generateCommentBodyHtml(review);
+
+                    // Determine if this review event is significant enough to render even if empty
+                    // (e.g., an explicit Approval or Change Request is meaningful)
+                    const hasMeaningfulState = review.state && review.state !== 'COMMENTED';
+
+                    // Skip rendering if it's just an empty 'COMMENTED' review event with no associated comments attached
                     if (!reviewBody && !hasMeaningfulState && associatedComments.length === 0) {
                          console.log(\`Skipping review submission #\${review.id} as it's empty and has no comments.\`);
-                         return ''; // Don't render purely empty 'COMMENTED' reviews
+                         return ''; // Return empty string to render nothing
                     }
                     // --- End Check ---
 
-
-                    // --- Generate HTML for associated comments ---
+                    // --- Generate HTML for Associated Comments ---
                     let commentsHtml = '';
                     if (associatedComments.length > 0) {
+                        // Use map() to call generateNestedReviewCommentHtml for each comment and join the results
                         commentsHtml = associatedComments.map(comment => generateNestedReviewCommentHtml(comment)).join('');
                     }
-                    // --- End generating comments HTML ---
+                    // --- End Generating Comments HTML ---
 
+                    // --- Construct Final HTML for the Review Submission ---
                     return \`<div class="timeline-item review-submission-item">
                                 <div class="item-header">
-                                    \${user ? \`<img class="avatar" src="\${user.avatar_url || ''}" alt="\${escapeHtml(user.login || '')}" width="20" height="20">\`: '<span class="avatar-placeholder"></span>'}
+                                    \${user ? \`<img class="avatar" src="\${user.avatar_url || ''}" alt="\${escapeHtml(user?.login || 'unknown user')}" width="20" height="20">\`: '<span class="avatar-placeholder"></span>'}
                                     <strong class="author">\${escapeHtml(user?.login || 'unknown user')}</strong>
                                     <span class="review-state \${stateClass}">\${stateFormatted}</span>
                                     \${review.html_url ? \`<a class="gh-link" href="\${review.html_url}" title="View review on GitHub" target="_blank">🔗</a>\` : ''}
-                                    <span class="timestamp">$\{submittedAt}</span>
+                                    <span class="timestamp">\${submittedAt}</span>
                                 </div>
-                                \${reviewBody}
-                                \${commentsHtml} {/* <-- Insert the generated comments HTML here */}
+                                \${reviewBody} {/* Render the main body of the review submission itself */}
+                                \${commentsHtml} {/* Render the nested HTML for all associated comments */}
                             </div>\`;
                 }
 
@@ -745,28 +900,84 @@ async function getWebviewTimelineHtml(context: vscode.ExtensionContext, webview:
                              </div>\`;
                 }
 
-                 // Function to parse diff hunks and add styling
-                 function parseAndStyleDiffHunks() {
-                     if (!timelineContainer) return;
-                     timelineContainer.querySelectorAll('.diff-hunk pre code').forEach(block => {
-                         if(block.dataset.styled) return; // Avoid re-styling
-                         // Ensure textContent is treated as a string
-                         const lines = String(block.textContent || '').split('\\n');
-                         let styledLines = '';
-                         lines.forEach(line => {
-                             let lineClass = '';
-                             // Use startsWith safely
-                             if (line.startsWith('+')) { lineClass = 'addition'; }
-                             else if (line.startsWith('-')) { lineClass = 'deletion'; }
-                             else if (line.startsWith('@@')) { lineClass = 'hunk-header'; }
-                             // Escape the line content itself before embedding in span
-                             styledLines += \`<span class="\${lineClass}">\${escapeHtml(line)}\\n</span>\`;
-                         });
-                         // Replace the content with styled spans
-                         block.innerHTML = styledLines;
-                         block.dataset.styled = 'true'; // Mark as styled
-                     });
-                 }
+                // Function to parse diff hunks and add styling WITH LINE NUMBERS (Corrected)
+                function parseAndStyleDiffHunks() {
+                    // console.log("Running parseAndStyleDiffHunks..."); // Keep logs if needed
+                    if (!timelineContainer) {
+                        console.error("Timeline container not found!");
+                        return;
+                    }
+                    timelineContainer.querySelectorAll('.diff-hunk pre code').forEach((block, blockIndex) => {
+                        if(block.dataset.styled) return;
+                        // console.log(\`Processing diff block \${blockIndex}\`);
+
+                        const lines = String(block.textContent || '').split('\\n'); // Use double backslash for JS string literal
+                        let styledLinesHtml = '';
+                        let currentLineNum = -1;
+                        let hunkHeaderFound = false;
+                        let startLineFromHeader = -1;
+
+                        lines.forEach((line, lineIndex) => {
+                            let lineClass = '';
+                            let displayLineNum = '';
+                            const trimmedLine = line.trim();
+
+                            if (trimmedLine.startsWith('@@') && !hunkHeaderFound) {
+                                hunkHeaderFound = true;
+                                lineClass = 'hunk-header';
+                                // console.log(\`  Line \${lineIndex}: Hunk header found: "\${line}" (Trimmed: "\${trimmedLine}")\`);
+
+                                // Regex with escaped backslashes for \d
+                                const match = trimmedLine.match(/^@@ -\\d+(?:,\\d+)? \\+(\\d+)(?:,\\d+)? @@/);
+
+                                // console.log("    -> Regex Match Result:", match); // Keep log if needed
+
+                                if (match && match[1]) {
+                                    startLineFromHeader = parseInt(match[1], 10);
+                                    currentLineNum = startLineFromHeader;
+                                    displayLineNum = '...';
+                                    // console.log(\`    -> SUCCESS: Parsed start line: \${startLineFromHeader}\`);
+                                } else {
+                                    // console.error(\`    -> FAILED: Could not extract start line from header (trimmed): "\${trimmedLine}"\`);
+                                    currentLineNum = -1;
+                                    displayLineNum = 'ERR';
+                                }
+                            } else if (trimmedLine.startsWith('+')) {
+                                lineClass = 'addition';
+                                if (hunkHeaderFound && currentLineNum !== -1) {
+                                    displayLineNum = String(currentLineNum);
+                                    currentLineNum++;
+                                } else { displayLineNum = '?'; }
+                            } else if (trimmedLine.startsWith('-')) {
+                                lineClass = 'deletion';
+                                displayLineNum = ' ';
+                            } else {
+                                lineClass = 'context';
+                                if (hunkHeaderFound && currentLineNum !== -1 && line.length > 0) {
+                                    displayLineNum = String(currentLineNum);
+                                    currentLineNum++;
+                                } else {
+                                    displayLineNum = ' ';
+                                }
+                            }
+
+                            // Escape the actual code line content for safe HTML insertion
+                            const escapedLine = escapeHtml(line);
+
+                            // Ensure \${escapedLine} performs variable substitution correctly
+                            styledLinesHtml += \`<span class="line \${lineClass}">\` +
+                                                \`<span class="line-num">\${displayLineNum}</span>\` +
+                                                \`<span class="line-content \${lineClass}">\${escapedLine}</span>\` + // <-- Corrected this line
+                                            \`</span>\`; // Use escaped newline for JS string literal
+
+                        });
+
+                        block.innerHTML = styledLinesHtml;
+                        block.dataset.styled = 'true';
+                        // console.log(\`Finished processing block \${blockIndex}. Started at line \${startLineFromHeader}.\`);
+                    });
+                    // console.log("Finished parseAndStyleDiffHunks.");
+                }
 
 
                 // --- Main Rendering Function ---
@@ -808,11 +1019,11 @@ async function getWebviewTimelineHtml(context: vscode.ExtensionContext, webview:
                         }
                     });
                     timelineContainer.appendChild(fragment);
-                    try {
-                         parseAndStyleDiffHunks(); // Style diffs after inserting into DOM
-                    } catch(e) {
-                         console.error("Error styling diff hunks:", e);
-                    }
+                    // try {
+                    //      parseAndStyleDiffHunks(); // Style diffs after inserting into DOM
+                    // } catch(e) {
+                    //      console.error("Error styling diff hunks:", e);
+                    // }
                      console.log("Timeline rendering complete.");
                 }
 
