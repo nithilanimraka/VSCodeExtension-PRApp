@@ -32,7 +32,23 @@ type FromCreatePrWebviewMessage =
     | { command: 'createPrRequest'; data: { base: string; head: string; title: string; body: string; } }
     | { command: 'cancelPr' }
     | { command: 'getChangedFiles' } // Webview can request file list
-    | { command: 'showError'; text: string };
+    | { command: 'showError'; text: string }
+    | { command: 'compareBranches'; base: string; head: string };
+
+// Type for files returned by compareCommits API (subset needed)
+//type ComparisonFile = Endpoints["GET /repos/{owner}/{repo}/compare/{base}...{head}"]['response']['data']['files'][number];
+
+// Add this definition instead:
+// Manually define the expected structure for a file from the compareCommits API
+type ComparisonFile = {
+    sha: string;
+    filename: string;
+    // Status from compareCommits API
+    status: "added" | "removed" | "modified" | "renamed" | "copied" | "changed" | "unchanged";
+    // Add other fields if needed later (e.g., patch)
+    // patch?: string;
+    // previous_filename?: string;
+};
 
 // --- NEW: Helper function to safely get the Git API ---
 async function getGitApi() {
@@ -155,6 +171,25 @@ export class CreatePrViewProvider implements vscode.WebviewViewProvider {
                      this.sendDataToWebview({ headBranch: undefined, baseBranch: undefined, changedFiles: [] });
                     break;
 
+                case 'compareBranches':
+                    if (this._currentGitInfo.owner && this._currentGitInfo.repo && data.base && data.head) {
+                            console.log(`Provider received compare request: ${data.base}...${data.head}`);
+                        const comparisonFiles = await this.getComparisonFiles(
+                            this._currentGitInfo.owner,
+                            this._currentGitInfo.repo,
+                            data.base,
+                            data.head
+                        );
+                            console.log("Comparison result:", comparisonFiles);
+                        // Send *only* the updated file list back
+                            this.sendDataToWebview({ changedFiles: comparisonFiles });
+                    } else {
+                            console.warn("Missing owner/repo/base/head for branch comparison.");
+                            // Optionally send back an empty list or error state
+                            this.sendDataToWebview({ changedFiles: [] });
+                    }
+                    break;
+
                 case 'showError':
                     if (data.text) {
                         vscode.window.showErrorMessage(data.text); // Show the error using VS Code UI
@@ -188,6 +223,62 @@ export class CreatePrViewProvider implements vscode.WebviewViewProvider {
          if (this._view) {
              this._view.webview.postMessage({ command: 'loadFormData', data: gitInfo });
          }
+    }
+
+    // --- Method to compare branches ---
+    private async getComparisonFiles(owner: string, repo: string, base: string, head: string): Promise<ChangedFile[]> {
+        const octokit = await getOctokit();
+        if (!octokit) {
+            vscode.window.showErrorMessage("GitHub authentication needed to compare branches.");
+            return [];
+        }
+
+        try {
+            const response = await octokit.repos.compareCommits({
+                owner,
+                repo,
+                base,
+                head,
+            });
+
+            // --- Add null/undefined check for response.data.files ---
+            if (response.status === 200 && response.data.files) {
+                // Map the response files (which should be ComparisonFile[]) to our simpler ChangedFile structure
+                return response.data.files.map((file: ComparisonFile) => ({ // Use the manual ComparisonFile type here
+                    path: file.filename,
+                    status: this.mapComparisonStatus(file.status),
+                }));
+            } else {
+                    console.warn(`Compare branches response missing 'files' array or status not 200. Status: ${response.status}`);
+                    // Handle cases like identical branches where 'files' might be empty or missing
+                    if (response.data.status === 'identical') {
+                        return []; // No files changed
+                    }
+                    vscode.window.showWarningMessage(`Could not retrieve file changes for ${base}...${head}.`);
+                    return [];
+            }
+        } catch (error: any) {
+             console.error(`Error comparing branches ${base}...${head}:`, error);
+             // Provide more specific feedback if possible (e.g., 404 often means bad branch name)
+             const message = error.status === 404
+                 ? `Could not compare: One or both branches ('${base}', '${head}') not found.`
+                 : `Error comparing branches: ${error.message || error}`;
+             vscode.window.showErrorMessage(message);
+             return []; // Return empty list on error
+        }
+    }
+
+    // Helper to map GitHub's comparison status strings to our single chars
+    private mapComparisonStatus(status?: string): ChangedFile['status'] {
+        switch (status) {
+            case 'added': return 'A';
+            case 'removed': return 'D';
+            case 'modified': return 'M';
+            case 'renamed': return 'R';
+            case 'changed': return 'M'; // Treat 'changed' as 'modified'
+            // case 'copied': return 'C'; // compareCommits doesn't typically return 'copied'
+            default: return '?';
+        }
     }
 
     // ---Method to fetch branches ---
@@ -267,9 +358,8 @@ export class CreatePrViewProvider implements vscode.WebviewViewProvider {
 
         const changedFiles = await this.getChangedFilesFromGit(repo); // Pass repo object
 
-        // --- Add console log to check file detection ---
+        // ---  log to check file detection ---
         console.log(`Detected ${changedFiles.length} changed files in provider:`, changedFiles);
-        // --- End console log ---
 
         return { headBranch, baseBranch, remoteUrl, owner, repo: repoName, changedFiles, branches };
     }
