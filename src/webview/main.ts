@@ -321,25 +321,12 @@ type TimelineItem = ReviewTimelineItem | ReviewCommentTimelineItem | IssueCommen
         const fullCommitMessage = escapeHtml(commitData.commit.message); // For tooltip
         const commitUrl = commitData.html_url || '';
 
-        // // --- Use the URI stored from the message ---
-        // const commitIconUri = commitIconUriFromMessage;
-        // console.log(`generateCommitHtml: Using stored Icon URI from message: "${commitIconUri}"`); // Keep log for debugging
-
-        // --- Define SVG Icon String with fill="currentColor" ---
-           // SVG path data for Codicon 'git-commit'
-           const commitIconSvg = `
-               <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor">
-                   <path d="M10.5 7.75a2.75 2.75 0 1 1-5.5 0 2.75 2.75 0 0 1 5.5 0Zm-8.25.75a.75.75 0 0 0 0 1.5h2a.75.75 0 0 0 0-1.5h-2Zm10.5-1.5a.75.75 0 0 0-1.5 0v2a.75.75 0 0 0 1.5 0v-2Zm-5 4.5a.75.75 0 0 0 0 1.5h2a.75.75 0 0 0 0-1.5h-2Z"/>
-               </svg>
-           `;
-           // --- End SVG ---
-
 
         // Construct HTML with new structure and classes
         return `<div class="timeline-item commit-item">
                    <div class="item-header">
                         <div class="commit-info">
-                            <span class="commit-icon-wrapper">${commitIconSvg}</span>
+                            <span class="codicon codicon-git-commit"></span>
                             ${avatarUrl ? `<img class="avatar" src="${avatarUrl}" alt="${authorName}" width="16" height="16">` : '<span class="avatar-placeholder" style="width:16px; height:16px;"></span>'}
                             <span class="author">${authorName}</span>
                             <span class="commit-title" title="${fullCommitMessage}">${commitTitle}</span>
@@ -406,18 +393,11 @@ type TimelineItem = ReviewTimelineItem | ReviewCommentTimelineItem | IssueCommen
         const message = event.data;
         switch (message.command) {
             case 'updateTimeline':
-                //console.log('Received timeline update from extension:', message.timeline);
                 renderTimeline(message.timeline);
                 break;
             case 'loadTimeline': // Handle initial load
                 console.log('Received initial timeline data from extension:', message.data);
-                // commitIconUriFromMessage = message.iconUri || '';
-                // console.log(`Stored commit icon URI from message: "${commitIconUriFromMessage}"`);
                 renderTimeline(message.data);
-                
-                 // Optional: Hide a dedicated loading indicator if you added one
-                 // const loadingIndicator = document.getElementById('loading-indicator');
-                 // if (loadingIndicator) { loadingIndicator.style.display = 'none'; }
                 break;
             case 'showError':
                 if (timelineContainer) {

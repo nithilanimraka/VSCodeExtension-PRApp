@@ -282,49 +282,69 @@ async function createOrShowPrDetailWebview(context: vscode.ExtensionContext, prI
 // =================================
 // WEBVIEW CONTENT UPDATE
 // =================================
-async function updateWebviewContent(context: vscode.ExtensionContext, webview: vscode.Webview, prInfo: PullRequestInfo) {
-    const octokit = await getOctokit();
+async function updateWebviewContent(
+    context: vscode.ExtensionContext,
+    webview: vscode.Webview,
+    prInfo: PullRequestInfo
+) {
+    // 1. Get Octokit instance
+    const octokit = await getOctokit(); // Ensure this handles potential auth errors gracefully
     if (!octokit) {
-        console.error("Octokit not available for updating webview content");
-        // Display error in webview if Octokit fails
-        webview.html = await getWebviewTimelineHtml(context, webview, prInfo); // Set basic HTML first
-        webview.postMessage({ command: 'showError', message: 'Error: Cannot connect to GitHub.' }); // Send error message
-        return;
+        console.error("[updateWebviewContent] Octokit not available.");
+        try {
+            // Try setting basic HTML shell to display an error within the webview
+            const initialHtml = await getWebviewTimelineHtml(context, webview, prInfo);
+            webview.html = initialHtml;
+            // Send an error message for the webview script to display
+            webview.postMessage({ command: 'showError', message: 'Error: Could not connect to GitHub. Please check authentication.' });
+        } catch (htmlError) {
+            console.error("[updateWebviewContent] Error getting webview HTML shell while handling Octokit error:", htmlError);
+            webview.html = "<html><body>Critical error initializing view. GitHub connection failed.</body></html>";
+        }
+        return; // Stop if Octokit isn't available
     }
 
-    // 1. Generate the Icon URI *before* setting HTML
-    const commitIconUri = webview.asWebviewUri(vscode.Uri.joinPath(context.extensionUri, 'icons_svg', 'commit.svg'));
-    console.log(`DEBUG: Commit Icon URI generated for postMessage: ${commitIconUri.toString()}`);
-
-    // 2. Set initial static HTML (still needed to load the script)
-    // Pass prInfo to getWebviewTimelineHtml; it no longer needs the icon URI itself.
-    webview.html = await getWebviewTimelineHtml(context, webview, prInfo);
-
-    // 3. Fetch dynamic data
-    console.log(`Workspaceing timeline data for PR #${prInfo.number} to send to webview...`);
-    let timelineItems: TimelineItem[] = [];
+    // 2. Set the initial static HTML structure immediately.
+    // This HTML contains the <script> tag for the bundled webview code,
+    // the <link> tag for codicon.css, basic styles, and a "Loading..." indicator.
     try {
+        webview.html = await getWebviewTimelineHtml(context, webview, prInfo);
+    } catch (htmlError) {
+        console.error("[updateWebviewContent] Error setting initial webview HTML:", htmlError);
+        // Display a fallback error directly in the webview
+        webview.html = `<html><body>Error loading UI shell: ${escapeHtml(String(htmlError))}</body></html>`;
+        return; // Stop if the basic HTML fails
+    }
+
+
+    // 3. Fetch the actual timeline data asynchronously.
+    console.log(`[updateWebviewContent] Fetching timeline data for PR #${prInfo.number} to send to webview...`);
+    let timelineItems: TimelineItem[] = []; // Default to empty array
+    try {
+        // fetchPrTimelineData should handle its internal errors and return [] on failure if possible
         timelineItems = await fetchPrTimelineData(octokit, prInfo);
     } catch (fetchError) {
-         console.error(`Error fetching timeline data for PR #${prInfo.number}:`, fetchError);
+         console.error(`[updateWebviewContent] Error fetching timeline data for PR #${prInfo.number}:`, fetchError);
+         // Send an error message to the webview script
          webview.postMessage({ command: 'showError', message: `Error fetching timeline: ${fetchError instanceof Error ? fetchError.message : String(fetchError)}` });
-         return;
+         // Keep timelineItems as empty array, but continue to update internal state if needed
     }
 
-    // 4. Send data AND the icon URI to the loaded webview script
-    console.log(`Sending <span class="math-inline">${timelineItems.length} timeline items and icon URI to webview for PR #</span>${prInfo.number}`);
+
+    // 4. Send the fetched data (or empty array on error) to the webview script.
+    // The webview script's message listener will handle the 'loadTimeline' command.
+    console.log(`[updateWebviewContent] Sending ${timelineItems.length} timeline items to webview for PR #${prInfo.number}`);
     webview.postMessage({
         command: 'loadTimeline',
-        data: timelineItems,
-        // --- ADD ICON URI TO PAYLOAD ---
-        iconUri: commitIconUri.toString()
+        data: timelineItems
+        // Note: We are no longer sending icon URI or SVG string here
     });
 
-    // 5. Update internal state for polling etc.
+    // 5. Update the internally stored state for this webview (used for polling comparison).
     const activeWebview = activePrDetailPanels.get(prInfo.number);
     if (activeWebview) {
-        activeWebview.prInfo = prInfo;
-        activeWebview.currentTimeline = timelineItems;
+        activeWebview.prInfo = prInfo; // Update PR info (e.g., if title changed)
+        activeWebview.currentTimeline = timelineItems; // Store the latest data
     }
 }
 
@@ -587,20 +607,11 @@ const commitStyles = `
         font-size: inherit; /* Inherit smaller size */
     }
 
-    .commit-icon-wrapper {
-               display: inline-block; /* Or flex-shrink: 0; if inside flex */
-               width: 16px;
-               height: 16px;
-               margin-right: 5px; /* Space between icon and avatar */
-               vertical-align: text-bottom; /* Align with text */
-               /* Set the color using a theme variable - SVG fill="currentColor" will inherit this */
-               color: var(--vscode-icon-foreground);
-    }
-    .commit-icon-wrapper svg {
-        /* Ensure SVG fills the wrapper */
-        display: block;
-        width: 100%;
-        height: 100%;
+    .commit-info .codicon { /* Target codicons within commit-info */
+        vertical-align: text-bottom; /* Align icon */
+        margin-right: 5px;      /* Space after icon */
+        /* Color is usually inherited or set by codicon.css based on theme */
+        /* You could force it if needed: color: var(--vscode-icon-foreground); */
     }
 
 ]
@@ -623,7 +634,8 @@ async function getWebviewTimelineHtml(
     const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(context.extensionUri, 'dist', 'webview', 'main.js'));
 
     // --- Get URI for Codicon CSS ---
-    //const codiconCssUri = webview.asWebviewUri(vscode.Uri.joinPath(context.extensionUri, 'node_modules', '@vscode', 'codicons', 'dist', 'codicon.css'));
+    const codiconCssUri = webview.asWebviewUri(vscode.Uri.joinPath(context.extensionUri, 'node_modules', '@vscode', 'codicons', 'dist', 'codicon.css'));
+    console.log(`DEBUG: Codicon CSS URI generated: ${codiconCssUri.toString()}`);
     // --- End Get URI ---
 
     // Basic HTML structure
@@ -634,6 +646,7 @@ async function getWebviewTimelineHtml(
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; img-src ${webview.cspSource} https: data:; script-src 'nonce-${nonce}' ${webview.cspSource}; font-src ${webview.cspSource};">
         <title>PR #${prInfo.number}</title>
+        <link href="${codiconCssUri}" rel="stylesheet" />
         <style nonce="${nonce}">
             /* Inject all necessary CSS rules here */
             ${commonStyles}
