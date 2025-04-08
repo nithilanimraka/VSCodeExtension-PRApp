@@ -1,0 +1,126 @@
+/* Common Styles */
+    body { font-family: var(--vscode-font-family); color: var(--vscode-editor-foreground); background-color: var(--vscode-editor-background); padding: 15px 25px; }
+    #timeline-area { margin-top: 20px; }
+    #loading-indicator { padding: 10px; font-style: italic; opacity: 0.8; }
+    a { color: var(--vscode-textLink-foreground); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    hr { border: none; border-top: 1px solid var(--vscode-editorWidget-border, #444); margin: 15px 0; }
+    code { font-family: var(--vscode-editor-font-family); font-size: calc(var(--vscode-editor-font-size) * 0.9); background-color: var(--vscode-textBlockQuote-background); border: 1px solid var(--vscode-button-secondaryBackground); border-radius: 3px; padding: 0.1em 0.3em; }
+    .timeline-item { margin-bottom: 16px; padding-top: 16px; border-top: 1px solid var(--vscode-editorWidget-border, #444); }
+    .timeline-item:first-child { border-top: none; padding-top: 0; }
+    .item-header { margin-bottom: 8px; display: flex; align-items: center; gap: 8px; font-size: 0.9em; color: var(--vscode-descriptionForeground); flex-wrap: wrap; }
+    .item-header .author { font-weight: bold; color: var(--vscode-editor-foreground); }
+    .timestamp { font-size: 0.9em; white-space: nowrap; opacity: 0.8; margin-left: auto; }
+    .file-path { font-family: var(--vscode-editor-font-family); background-color: var(--vscode-textBlockQuote-background); padding: 1px 4px; border-radius: 3px; border: 1px solid var(--vscode-button-secondaryBackground); }
+    .gh-link { margin-left: 5px; font-size: 0.9em; opacity: 0.7; }
+    .gh-link:hover { opacity: 1; }
+    .avatar { border-radius: 50%; vertical-align: middle; border: 1px solid var(--vscode-editorWidget-border, #444); width: 20px; height: 20px; }
+    .avatar-placeholder { display: inline-block; width: 20px; height: 20px; background-color: var(--vscode-editorWidget-border); border-radius: 50%; vertical-align: middle; }
+    .comment-body { padding: 5px 0; margin-left: 28px; margin-top: -5px; line-height: 1.4; }
+    .comment-body p:first-child { margin-top: 0; }
+    .comment-body p:last-child { margin-bottom: 0; }
+    .review-state { font-weight: bold; padding: 1px 4px; border-radius: 3px; font-size: 0.9em; }
+    .review-state.approved { color: var(--vscode-gitDecoration-addedResourceForeground); background-color: rgba(47, 131, 47, 0.15); }
+    .review-state.commented { color: var(--vscode-descriptionForeground); background-color: var(--vscode-textBlockQuote-background); }
+    .review-state.changes_requested { color: var(--vscode-gitDecoration-modifiedResourceForeground); background-color: rgba(188, 76, 0, 0.15); }
+    .review-state.dismissed { color: var(--vscode-descriptionForeground); background-color: var(--vscode-textBlockQuote-background); text-decoration: line-through; }
+    .commit-item .item-header { gap: 5px; }
+    .commit-message { margin-left: 28px; margin-top: -5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .commit-item code { font-size: 0.85em; }
+    /* Add .line-range style */
+    .line-range { opacity: 0.8; margin-left: 5px; font-size: 0.95em; }
+
+
+/* Markdown Styles */
+    .comment-body strong { font-weight: var(--vscode-markdown-bold-font-weight, bold); }
+    .comment-body em { font-style: italic; }
+    .comment-body blockquote { background: var(--vscode-textBlockQuote-background); border-left: 5px solid var(--vscode-textBlockQuote-border); margin: 5px 0 5px 5px; padding: 5px 10px; }
+    .comment-body ul, .comment-body ol { margin-left: 25px; margin-top: 5px; margin-bottom: 5px; }
+    .comment-body pre { font-family: var(--vscode-editor-font-family); font-size: var(--vscode-editor-font-size); line-height: var(--vscode-editor-line-height); background-color: var(--vscode-textBlockQuote-background); padding: 10px; border: 1px solid var(--vscode-editorWidget-border, #444); border-radius: 4px; overflow-x: auto; margin: 5px 0; }
+    .comment-body :not(pre)>code { font-family: var(--vscode-editor-font-family); font-size: calc(var(--vscode-editor-font-size) * 0.9); background-color: var(--vscode-textBlockQuote-background); border: 1px solid var(--vscode-button-secondaryBackground); border-radius: 3px; padding: 0.1em 0.3em; }
+
+/* Diff Hunk styles */
+    .diff-hunk { border: 1px solid var(--vscode-editorWidget-border, #ccc); border-radius: 4px; margin-bottom: 8px; overflow-x: auto; }
+    .diff-hunk pre { margin: 0; padding: 0; background-color: var(--vscode-editor-background); border-radius: 4px; }
+    .diff-hunk .line { display: flex; white-space: nowrap; margin: 0; padding: 0; }
+    .diff-hunk .line-num { flex-shrink: 0; width: 45px; padding-right: 10px; text-align: right; opacity: 0.7; user-select: none; color: var(--vscode-editorLineNumber-foreground); font-family: var(--vscode-editor-font-family); font-size: var(--vscode-editor-font-size); line-height: var(--vscode-editor-line-height); margin: 0; padding: 0 10px 0 0; }
+    .diff-hunk .line.hunk-header .line-num { opacity: 0.5; }
+    .diff-hunk .line-content { flex-grow: 1; white-space: pre; font-family: var(--vscode-editor-font-family); font-size: var(--vscode-editor-font-size); line-height: var(--vscode-editor-line-height); margin: 0; padding-top: 0; padding-bottom: 0; border-left: 3px solid transparent; padding-left: 10px; }
+    .diff-hunk .line-content.addition { background-color: rgba(47, 131, 47, 0.15); border-left-color: var(--vscode-gitDecoration-addedResourceForeground); }
+    .diff-hunk .line-content.deletion { background-color: rgba(188, 76, 0, 0.15); border-left-color: var(--vscode-gitDecoration-deletedResourceForeground); }
+    .diff-hunk .line-content.hunk-header { color: var(--vscode-descriptionForeground); background-color: var(--vscode-textBlockQuote-background); padding: 2px 10px; font-style: italic; border-left: none; }
+
+
+/* Commit Styles */
+    .timeline-item.commit-item {
+    /* Reset some defaults if needed */
+    padding-top: 8px; /* Less padding than comments? */
+    padding-bottom: 8px;
+    margin-bottom: 0; /* Make them appear closer together */
+    max-width: 80%; 
+    margin-left: auto;
+    margin-right: auto;
+    }
+    .commit-item .item-header {
+        display: flex;          /* Use flexbox for layout */
+        align-items: center;    /* Align items vertically */
+        gap: 8px;
+        margin-bottom: 0;       /* Remove bottom margin */
+        font-size: var(--vscode-font-size); /* Use standard font size */
+        color: var(--vscode-editor-foreground); /* Standard text color */
+        flex-wrap: nowrap;      /* Prevent wrapping */
+    }
+    /* Part containing author and message title */
+    .commit-item .commit-info {
+        flex-grow: 1;         /* Allow this part to take up space */
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        overflow: hidden;     /* Hide overflow */
+    }
+    .commit-item .commit-info .author {
+        font-weight: normal; /* Make author normal weight */
+        flex-shrink: 0; /* Don't shrink author name */
+    }
+    .commit-item .commit-title {
+        flex-grow: 1;          /* Allow title to take space */
+        white-space: nowrap;   /* Prevent title wrap */
+        overflow: hidden;      /* Hide overflow */
+        text-overflow: ellipsis; /* Add '...' for overflow */
+        opacity: 0.9;          /* Slightly dimmer than author? */
+        margin-left: 5px;
+    }
+    /* Part containing SHA and timestamp */
+    .commit-item .commit-meta {
+        flex-shrink: 0;        /* Don't shrink this part */
+        margin-left: auto;     /* Pushes it to the right */
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 0.9em;      /* Smaller font for meta */
+        color: var(--vscode-descriptionForeground); /* Dimmer color */
+    }
+    .commit-item .commit-meta .commit-sha a,
+    .commit-item .commit-meta .commit-sha code {
+        font-family: var(--vscode-editor-font-family); /* Monospace for SHA */
+        font-size: inherit; /* Inherit smaller size */
+        /* Ensure code styles don't override color */
+        color: var(--vscode-textLink-foreground);
+        background: none;
+        border: none;
+        padding: 0;
+    }
+    .commit-item .commit-meta .timestamp {
+        white-space: nowrap;
+        opacity: 1; /* Reset opacity if inherited */
+        margin-left: 0; /* Reset margin */
+        font-size: inherit; /* Inherit smaller size */
+    }
+
+    .commit-info .codicon { /* Target codicons within commit-info */
+        vertical-align: text-bottom; /* Align icon */
+        margin-right: 5px;      /* Space after icon */
+        /* Color is usually inherited or set by codicon.css based on theme */
+        /* You could force it if needed: color: var(--vscode-icon-foreground); */
+    }
+

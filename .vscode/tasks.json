@@ -3,18 +3,42 @@
 {
 	"version": "2.0.0",
 	"tasks": [
-		{
-			"type": "npm",
-			"script": "watch",
-			"problemMatcher": "$tsc-watch",
-			"isBackground": true,
-			"presentation": {
-				"reveal": "never"
-			},
-			"group": {
-				"kind": "build",
-				"isDefault": true
-			}
-		}
+        {
+            "label": "watch", // Matches the name in launch.json and package.json script
+            "type": "npm", // Specifies it's an npm script
+            "script": "watch", // The name of the script in package.json
+            "isBackground": true, // Allows the task to run continuously in the background
+            "presentation": {
+                "reveal": "never" // Don't automatically show the terminal for this task
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true // Makes this the default build task (optional)
+            },
+            "problemMatcher": [
+                {
+                    // This problem matcher helps VS Code know when esbuild watch is ready
+                    "owner": "esbuild-watch", // Custom name
+                    "pattern": {
+                        // A simple regex, might need adjustment based on exact esbuild output
+                        // This pattern itself doesn't capture problems, it's used by background matching
+                         "regexp": "^$", // Matches an empty line - effectively ignored here
+                         "file": 1, "line": 1, "column": 1, "message": 1
+                    },
+                    "background": {
+                        "activeOnStart": true,
+                        // This pattern seems okay
+                        "beginsPattern": {
+                            "regexp": "^\\[watch\\].*build finished|Rebuild finished.*"
+                        },
+                        // --- CHANGE THIS REGEX ---
+                        "endsPattern": {
+                            // Update to match the actual output "watching for changes..."
+                            "regexp": "^\\[watch\\].*watching for changes\\.\\.\\.$" // Note escaped dots \. and end anchor $
+                        }
+                    }
+                }
+            ]
+        }
 	]
 }
