@@ -5,6 +5,8 @@ import { PrDataProvider, PullRequestItem } from './prDataProvider';
 import { Octokit } from '@octokit/rest'; // Import Octokit type
 import type { Endpoints } from "@octokit/types"; // Import types for response data
 import type { PullRequestInfo } from './prDataProvider';
+import { CreatePrViewProvider } from './createPrViewProvider'; 
+import { getNonce, escapeHtml } from './utils'; 
 
 import * as fs from 'fs';
 import * as path from 'path';
@@ -73,6 +75,13 @@ export function activate(context: vscode.ExtensionContext) {
     prDataProvider = new PrDataProvider();
     context.subscriptions.push(vscode.window.registerTreeDataProvider('yourPrViewId', prDataProvider));
 
+    // --- Register Create PR View ---
+    // Store the provider instance so the command can call it
+    const createPrViewProvider = new CreatePrViewProvider(context);
+    context.subscriptions.push(
+        vscode.window.registerWebviewViewProvider(CreatePrViewProvider.viewType, createPrViewProvider)
+    );
+
     // --- 2. Register Commands ---
 
     // Refresh Command
@@ -84,99 +93,25 @@ export function activate(context: vscode.ExtensionContext) {
         }
     }));
 
-        // Create Pull Request Command
-        context.subscriptions.push(vscode.commands.registerCommand('yourExtension.createPullRequest', async () => {
-            const octokit = await getOctokit();
-            if (!octokit) { vscode.window.showErrorMessage("Please sign in to GitHub first."); return; }
-            const baseBranch = await vscode.window.showInputBox({ prompt: 'Enter base branch (e.g., main)' });
-            if (!baseBranch) return;
-            const headBranch = await vscode.window.showInputBox({ prompt: 'Enter head branch (your current branch)' });
-            if (!headBranch) return;
-            const title = await vscode.window.showInputBox({ prompt: 'Enter PR Title' });
-            if (!title) return;
-            const body = await vscode.window.showInputBox({ prompt: 'Enter PR Body (optional)' });
-    
-            // FIXME: Implement proper logic to get owner/repo from current workspace/git remote
-            // Get repository owner and name dynamically from git remote
-            const gitExtension = vscode.extensions.getExtension('vscode.git')?.exports;
-            if (!gitExtension) {
-                vscode.window.showErrorMessage('Git extension not found. Make sure Git is installed and enabled.');
-                return;
-            }
+    // Create Pull Request Command (Focuses the Create PR View & loads data)
+    // Make sure this is the ONLY registration block for this command ID
+    context.subscriptions.push(vscode.commands.registerCommand('yourExtension.createPullRequest', async () => {
+        // 1. Focus the separate "Create PR" view. VS Code activates its provider if needed.
+        await vscode.commands.executeCommand('yourCreatePrViewId.focus');
 
-            const api = gitExtension.getAPI(1);
-            const repositories = api.repositories;
+        // 2. Tell the CreatePrViewProvider instance to fetch initial Git data
+        //    and send it to its webview to populate the form.
+        await createPrViewProvider.prepareAndSendData();
+    }));
 
-            if (!repositories || repositories.length === 0) {
-                vscode.window.showErrorMessage('No Git repositories found in the current workspace.');
-                return;
-            }
-
-            // Use the first repository
-            const repository = repositories[0];
-            const remotes = repository.state.remotes;
-
-            if (!remotes || remotes.length === 0) {
-                vscode.window.showErrorMessage('No Git remotes found in the repository.');
-                return;
-            }
-
-            // Prefer 'origin' remote if available
-            const githubRemote = remotes.find((remote: { name: string }) => remote.name === 'origin') || remotes[0];
-            const remoteUrl = githubRemote.fetchUrl || githubRemote.pushUrl;
-
-            if (!remoteUrl) {
-                vscode.window.showErrorMessage('Could not determine GitHub remote URL.');
-                return;
-            }
-
-            // Parse GitHub URL to extract owner and repo name
-            let repoOwner = '';
-            let repoName = '';
-
-            if (remoteUrl.includes('github.com')) {
-                // Handle both HTTPS and SSH formats
-                const match = remoteUrl.match(/github\.com[/:](.*?)\/(.*?)(?:\.git)?$/);
-                if (match && match.length >= 3) {
-                    repoOwner = match[1];
-                    repoName = match[2];
-                }
-            }
-
-            if (!repoOwner || !repoName) {
-                vscode.window.showErrorMessage('Could not determine repository owner and name from remote URL.');
-                return;
-            }
-    
-            try {
-                await vscode.window.withProgress(
-                    { location: vscode.ProgressLocation.Notification, title: "Creating Pull Request...", cancellable: false },
-                    async (progress) => {
-                        const response = await octokit.pulls.create({ owner: repoOwner, repo: repoName, title: title, head: headBranch, base: baseBranch, body: body });
-                        if (response.status === 201) {
-                            vscode.window.showInformationMessage(`Pull Request #${response.data.number} created successfully!`);
-                            prDataProvider?.refresh();
-                        } else {
-                            vscode.window.showErrorMessage(`Failed to create PR (Status: ${response.status})`);
-                        }
-                    }
-                );
-            } catch (err) {
-                 console.error("Error creating PR:", err);
-                 if(err instanceof Error) {
-                     vscode.window.showErrorMessage(`Failed to create Pull Request: ${err.message}`);
-                 } else {
-                     vscode.window.showErrorMessage(`Failed to create Pull Request: ${String(err)}`);
-                 }
-             }
-        }));
-
-    // Command called when clicking a PR item in the tree
+    // Command for clicking a PR item in the Tree View (yourPrViewId)
     context.subscriptions.push(vscode.commands.registerCommand('yourExtension.viewPullRequest', (itemOrPrInfo: PullRequestItem | PullRequestInfo) => {
-        // Handle being called with either the full item or just the info
+        // Determine the PR info (handle TreeItem or direct info)
         const prInfo = (itemOrPrInfo instanceof PullRequestItem) ? itemOrPrInfo.prInfo : itemOrPrInfo;
+        // Assuming createOrShowPrDetailWebview is defined elsewhere in this file or imported
         createOrShowPrDetailWebview(context, prInfo);
     }));
+
 
     // NEW Command for the sidebar diff button
     context.subscriptions.push(vscode.commands.registerCommand('yourExtension.viewItemDiff', async (item: PullRequestItem) => {
@@ -758,22 +693,5 @@ export function deactivate() {
     console.log("Your PR extension deactivated.");
 }
 
-// Helper to escape HTML entities (ensure it handles non-strings)
-function escapeHtml(unsafe: unknown): string {
-    if (typeof unsafe !== 'string') {
-        if (unsafe === null || typeof unsafe === 'undefined') { return ''; }
-        try { return String(unsafe).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;"); }
-        catch (e) { return ''; }
-    }
-    return unsafe.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
- }
 
-// Helper to generate nonce for CSP
-function getNonce() {
-    let text = '';
-    const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    for (let i = 0; i < 32; i++) {
-        text += possible.charAt(Math.floor(Math.random() * possible.length));
-    }
-    return text;
-}
+

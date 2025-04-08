@@ -1,0 +1,167 @@
+body {
+    padding: 10px 15px;
+    font-family: var(--vscode-font-family);
+    font-size: var(--vscode-font-size);
+    color: var(--vscode-foreground);
+    background-color: var(--vscode-sideBar-background);
+    height: 100vh;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+}
+
+.create-pr-form {
+    display: flex;
+    flex-direction: column;
+    gap: 15px; /* Space between form groups */
+    flex-grow: 1; /* Allow form to grow */
+    overflow-y: auto; /* Add scroll if form content is long */
+}
+
+h2 {
+    margin: 0 0 10px 0;
+    padding: 0;
+    font-size: 1.1em;
+    font-weight: bold;
+    border-bottom: 1px solid var(--vscode-editorWidget-border, #444);
+    padding-bottom: 5px;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px; /* Space between label and input */
+}
+
+label {
+    font-weight: bold;
+    font-size: 0.95em;
+    color: var(--vscode-descriptionForeground);
+}
+
+/* Input and Textarea using VS Code styles */
+input[type="text"],
+textarea {
+    font-family: var(--vscode-font-family);
+    font-size: var(--vscode-font-size);
+    color: var(--vscode-input-foreground);
+    background-color: var(--vscode-input-background);
+    border: 1px solid var(--vscode-input-border, var(--vscode-editorWidget-border));
+    border-radius: 2px;
+    padding: 4px 6px;
+}
+input[readonly] {
+     background-color: var(--vscode-input-background); /* Or slightly different bg */
+     opacity: 0.7;
+     cursor: default;
+}
+
+
+input[type="text"]:focus,
+textarea:focus {
+    outline: 1px solid var(--vscode-focusBorder);
+    outline-offset: -1px;
+    border-color: var(--vscode-focusBorder);
+}
+
+textarea {
+    resize: vertical; /* Allow vertical resize */
+    min-height: 60px;
+}
+
+
+/* Files List */
+.files-list {
+    max-height: 150px; /* Limit height and add scroll */
+    overflow-y: auto;
+    border: 1px solid var(--vscode-input-border, var(--vscode-editorWidget-border));
+    border-radius: 2px;
+    padding: 5px;
+    background-color: var(--vscode-input-background); /* Match input background */
+}
+.files-list p {
+    margin: 0;
+    padding: 5px;
+    font-style: italic;
+    color: var(--vscode-descriptionForeground);
+}
+.files-list ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+.files-list li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 2px 4px;
+    font-size: 0.95em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.file-status {
+     font-family: var(--vscode-editor-font-family); /* Monospace often looks good */
+     font-weight: bold;
+     padding: 0 4px;
+     border-radius: 2px;
+     font-size: 0.9em;
+     min-width: 1.5em; /* Ensure consistent width */
+     text-align: center;
+}
+/* Style based on status */
+.file-status-a { color: var(--vscode-gitDecoration-addedResourceForeground); background-color: rgba(47, 131, 47, 0.15); }
+.file-status-m { color: var(--vscode-gitDecoration-modifiedResourceForeground); background-color: rgba(188, 76, 0, 0.15); }
+.file-status-d { color: var(--vscode-gitDecoration-deletedResourceForeground); background-color: rgba(171, 41, 41, 0.15); }
+.file-status-r { color: var(--vscode-gitDecoration-renamedResourceForeground); background-color: rgba(58, 106, 173, 0.15); }
+.file-status-c { color: var(--vscode-gitDecoration-submoduleResourceForeground); background-color: rgba(100, 100, 100, 0.15); }
+.file-status-\? { color: var(--vscode-gitDecoration-untrackedResourceForeground); background-color: rgba(117, 185, 56, 0.15); }
+
+.file-path {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+
+/* Button Group */
+.button-group {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end; /* Align buttons to the right */
+    margin-top: auto; /* Push buttons to the bottom */
+    padding-top: 15px; /* Add space above buttons */
+    border-top: 1px solid var(--vscode-editorWidget-border, #444);
+}
+
+/* Use standard button styles */
+#cancel-button,
+#create-button {
+    background-color: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
+    border: 1px solid var(--vscode-button-border, transparent);
+    padding: 6px 12px;
+    border-radius: 2px;
+    cursor: pointer;
+    min-width: 80px;
+    text-align: center;
+}
+#cancel-button:hover,
+#create-button:hover {
+    background-color: var(--vscode-button-hoverBackground);
+}
+#cancel-button:focus,
+#create-button:focus {
+     outline: 1px solid var(--vscode-focusBorder);
+     outline-offset: 1px;
+}
+
+/* Optional: Style Cancel button differently (secondary) */
+#cancel-button {
+    background-color: var(--vscode-button-secondaryBackground);
+    color: var(--vscode-button-secondaryForeground);
+    border: 1px solid var(--vscode-button-secondaryBorder, var(--vscode-button-border, transparent));
+}
+#cancel-button:hover {
+    background-color: var(--vscode-button-secondaryHoverBackground);
+}

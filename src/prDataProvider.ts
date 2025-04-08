@@ -72,13 +72,22 @@ export class PrDataProvider implements vscode.TreeDataProvider<vscode.TreeItem> 
             return [];
         } else {
             // If no element, return the top-level categories (similar to the screenshot)
-            return Promise.resolve([
+            const categories: vscode.TreeItem[] =[
                 new CategoryItem("Waiting For My Review", vscode.TreeItemCollapsibleState.Collapsed),
                 new CategoryItem("Assigned To Me", vscode.TreeItemCollapsibleState.Collapsed),
                 new CategoryItem("Created By Me", vscode.TreeItemCollapsibleState.Collapsed),
                 new CategoryItem("All Open", vscode.TreeItemCollapsibleState.Collapsed)
                 // Add "Local Pull Request Branches" if you implement that logic
-            ]);
+            ];
+
+            // --- NEW: Define the Create PR Action Item ---
+            const createPrActionItem = new ActionItem("Create Pull Request", {
+                command: 'yourExtension.createPullRequest', // Command already registered
+                title: 'Create Pull Request',
+                arguments: [] // No arguments needed for this command
+            });
+
+            return Promise.resolve([...categories, createPrActionItem]);
         }
     }
 
@@ -212,5 +221,20 @@ export class PullRequestItem extends vscode.TreeItem { // Make sure to EXPORT if
 
         // Optional: Icon based on PR state (open, merged, closed)
         this.iconPath = new vscode.ThemeIcon('git-pull-request');
+    }
+}
+
+class ActionItem extends vscode.TreeItem {
+    constructor(
+        public readonly label: string,
+        public readonly command?: vscode.Command // Make command optional initially
+    ) {
+        super(label, vscode.TreeItemCollapsibleState.None);
+        this.command = command;
+        // Use a suitable icon (e.g., 'add', 'git-pull-request-create')
+        // Check available Codicons: https://microsoft.github.io/vscode-codicons/dist/codicon.html
+        this.iconPath = new vscode.ThemeIcon('git-pull-request-create'); // Example: plus icon
+        this.tooltip = `Click to ${label}`;
+        this.contextValue = 'actionItem'; // Assign a context value if needed later
     }
 }

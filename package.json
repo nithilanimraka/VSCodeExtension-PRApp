@@ -9,8 +9,12 @@
   "categories": [
     "Other"
   ],
+  "extensionDependencies": [
+		"vscode.git"
+	],
   "activationEvents": [
     "onView:yourPrViewId",
+    "onView:yourCreatePrViewId",
     "onCommand:yourExtension.createPullRequest",
     "onCommand:yourExtension.refreshPrView",
     "onCommand:yourExtension.viewPullRequest",
@@ -24,7 +28,12 @@
         {
           "id": "your-pr-activitybar",
           "title": "Your PRs",
-          "icon": "$(git-pull-request)"
+          "icon": "$(code-review)"
+        },
+        {
+          "id": "your-create-pr-activitybar", 
+          "title": "Create PR", 
+          "icon": "$(git-pull-request-create)"
         }
       ]
     },
@@ -52,6 +61,11 @@
       {
         "command": "yourExtension.viewDiff",
         "title": "View Pull Request Diff"
+      },
+      {
+        "command": "yourExtension.showCreatePullRequestView", 
+        "title": "Show Create Pull Request View",
+        "category": "Your PR Extension"
       }
     ],
     "menus": {
@@ -83,12 +97,21 @@
           "icon": "$(git-pull-request)",
           "contextualTitle": "Your PRs"
         }
+      ],
+      "your-create-pr-activitybar": [ 
+        {
+          "id": "yourCreatePrViewId", 
+          "name": "Create Pull Request", 
+          "icon": "$(git-pull-request-create)", 
+          "type": "webview", 
+          "contextualTitle": "Create PR Form"
+        }
       ]
     }
   },
   "scripts": {
     "vscode:prepublish": "npm run esbuild-base -- --minify",
-    "esbuild-base": "esbuild ./src/extension.ts ./src/webview/main.ts ./src/webview/styles.css --bundle --external:vscode --format=cjs --platform=node --outdir=dist",
+    "esbuild-base": "esbuild ./src/extension.ts ./src/webview/main.ts ./src/webview/styles.css ./src/webview/createPrMain.ts ./src/webview/createPrStyles.css --bundle --external:vscode --format=cjs --platform=node --outdir=dist",
     "build": "npm run esbuild-base -- --sourcemap",
     "watch": "npm run esbuild-base -- --sourcemap --watch",
     "pretest": "npm run build && npm run lint",
