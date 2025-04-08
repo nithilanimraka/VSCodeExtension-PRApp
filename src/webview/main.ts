@@ -67,7 +67,7 @@ type TimelineItem = ReviewTimelineItem | ReviewCommentTimelineItem | IssueCommen
         if (comment.body_html && comment.body_html.trim() !== '') {
             commentBodyContent = comment.body_html;
         } else if (comment.body && comment.body.trim() !== '') {
-            console.log(`Rendering comment.body with markdown-it for comment #${comment.id}`);
+            //console.log(`Rendering comment.body with markdown-it for comment #${comment.id}`);
             try {
                 commentBodyContent = md.render(comment.body);
             } catch (e) {
@@ -95,11 +95,11 @@ type TimelineItem = ReviewTimelineItem | ReviewCommentTimelineItem | IssueCommen
     
         if (diffHunk && commentEndLine !== null && commentStartLine !== null) {
             // --- ADD LOGS HERE ---
-            console.log(`--- Hunk Details for Comment #${comment.id} ---`);
-            console.log(`Target Range: ${commentStartLine} - ${commentEndLine}`);
-            console.log(`Raw Diff Hunk Received:\n${diffHunk}`);
+            //console.log(`--- Hunk Details for Comment #${comment.id} ---`);
+            //console.log(`Target Range: ${commentStartLine} - ${commentEndLine}`);
+            //console.log(`Raw Diff Hunk Received:\n${diffHunk}`);
             // --- END LOGS ---
-            const lines = diffHunk.split('\n'); // Use double backslash for JS string literal
+            const lines = diffHunk.split('\n'); 
             let styledLinesHtml = '';
             let currentFileLineNum = -1;
             let hunkHeaderFound = false;
@@ -239,7 +239,7 @@ type TimelineItem = ReviewTimelineItem | ReviewCommentTimelineItem | IssueCommen
         const hasMeaningfulState = review.state && review.state !== 'COMMENTED';
 
         if (!reviewBody && !hasMeaningfulState && associatedComments.length === 0) {
-             console.log(`Skipping review submission #${review.id} as it's empty and has no comments.`);
+             //console.log(`Skipping review submission #${review.id} as it's empty and has no comments.`);
              return '';
         }
 
@@ -307,26 +307,52 @@ type TimelineItem = ReviewTimelineItem | ReviewCommentTimelineItem | IssueCommen
 
     // Commit renderer
     function generateCommitHtml(commitData: CommitListItem): string {
+        // Extract data (handle potential nulls)
         const authorInfo = commitData.commit.author;
-        const committerInfo = commitData.commit.committer;
-        const userAuthor = commitData.author;
+        const userAuthor = commitData.author; // GitHub user associated with the commit author email
         const commitShaShort = commitData.sha.substring(0, 7);
-        const avatarUrl = userAuthor?.avatar_url || '';
-        const authorName = escapeHtml(authorInfo?.name || userAuthor?.login || 'unknown');
-        const commitDate = authorInfo?.date ? new Date(authorInfo.date).toLocaleString() : (committerInfo?.date ? new Date(committerInfo.date).toLocaleString() : '');
-        const commitMessage = escapeHtml(commitData.commit.message.split('\n')[0]);
+        const avatarUrl = userAuthor?.avatar_url || ''; // Use associated GH user avatar if available
+        // Prefer GH user login, fallback to commit author name
+        const authorName = escapeHtml(userAuthor?.login || authorInfo?.name || 'unknown');
+        // Use commit author date, fallback to committer date might be less accurate for PR view
+        const commitDate = authorInfo?.date ? new Date(authorInfo.date).toLocaleString() : '';
+        // Get the first line of the commit message for the title
+        const commitTitle = escapeHtml(commitData.commit.message.split('\n')[0]); // Double BS for JS split
+        const fullCommitMessage = escapeHtml(commitData.commit.message); // For tooltip
         const commitUrl = commitData.html_url || '';
 
+        // // --- Use the URI stored from the message ---
+        // const commitIconUri = commitIconUriFromMessage;
+        // console.log(`generateCommitHtml: Using stored Icon URI from message: "${commitIconUri}"`); // Keep log for debugging
+
+        // --- Define SVG Icon String with fill="currentColor" ---
+           // SVG path data for Codicon 'git-commit'
+           const commitIconSvg = `
+               <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor">
+                   <path d="M10.5 7.75a2.75 2.75 0 1 1-5.5 0 2.75 2.75 0 0 1 5.5 0Zm-8.25.75a.75.75 0 0 0 0 1.5h2a.75.75 0 0 0 0-1.5h-2Zm10.5-1.5a.75.75 0 0 0-1.5 0v2a.75.75 0 0 0 1.5 0v-2Zm-5 4.5a.75.75 0 0 0 0 1.5h2a.75.75 0 0 0 0-1.5h-2Z"/>
+               </svg>
+           `;
+           // --- End SVG ---
+
+
+        // Construct HTML with new structure and classes
         return `<div class="timeline-item commit-item">
                    <div class="item-header">
-                        ${avatarUrl ? `<img class="avatar" src="${avatarUrl}" alt="${authorName}" width="20" height="20">` : '<span class="avatar-placeholder"></span>'}
-                        <span class="author"><span class="math-inline">${authorName}</span> committed
-                        ${commitUrl ? `<a href="${commitUrl}" target="_blank"><code>${commitShaShort}</code></a>` : `<code>${commitShaShort}</code>`}
-                        <span class="timestamp"><span class="math-inline">${commitDate}</span>
+                        <div class="commit-info">
+                            <span class="commit-icon-wrapper">${commitIconSvg}</span>
+                            ${avatarUrl ? `<img class="avatar" src="${avatarUrl}" alt="${authorName}" width="16" height="16">` : '<span class="avatar-placeholder" style="width:16px; height:16px;"></span>'}
+                            <span class="author">${authorName}</span>
+                            <span class="commit-title" title="${fullCommitMessage}">${commitTitle}</span>
                         </div>
-                        <div class="comment-body commit-message" title="${escapeHtml(commitData.commit.message)}">${commitMessage}</div>
-                </div>`;
-}
+                        <div class="commit-meta">
+                            <span class="commit-sha">
+                                ${commitUrl ? `<a href="${commitUrl}" target="_blank" title="View commit on GitHub"><code>${commitShaShort}</code></a>` : `<code>${commitShaShort}</code>`}
+                            </span>
+                            <span class="timestamp">${commitDate}</span>
+                        </div>
+                   </div>
+               </div>`;
+   }
 
 
     // --- Main Rendering Function ---
@@ -339,7 +365,7 @@ type TimelineItem = ReviewTimelineItem | ReviewCommentTimelineItem | IssueCommen
             return;
         }
 
-         console.log(`Rendering ${timelineData.length} timeline items...`);
+         //console.log(`Rendering ${timelineData.length} timeline items...`);
          const fragment = document.createDocumentFragment();
         timelineData.forEach((item: TimelineItem, index: number) => { // Add types here
             let elementHtml = '';
@@ -380,15 +406,23 @@ type TimelineItem = ReviewTimelineItem | ReviewCommentTimelineItem | IssueCommen
         const message = event.data;
         switch (message.command) {
             case 'updateTimeline':
-                console.log('Received timeline update from extension:', message.timeline);
+                //console.log('Received timeline update from extension:', message.timeline);
                 renderTimeline(message.timeline);
                 break;
             case 'loadTimeline': // Handle initial load
                 console.log('Received initial timeline data from extension:', message.data);
+                // commitIconUriFromMessage = message.iconUri || '';
+                // console.log(`Stored commit icon URI from message: "${commitIconUriFromMessage}"`);
                 renderTimeline(message.data);
+                
                  // Optional: Hide a dedicated loading indicator if you added one
                  // const loadingIndicator = document.getElementById('loading-indicator');
                  // if (loadingIndicator) { loadingIndicator.style.display = 'none'; }
+                break;
+            case 'showError':
+                if (timelineContainer) {
+                    timelineContainer.innerHTML = `<p style="color: var(--vscode-errorForeground);">${escapeHtml(message.message)}</p>`;
+                }
                 break;
         }
     });

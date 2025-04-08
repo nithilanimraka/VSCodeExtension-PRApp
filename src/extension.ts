@@ -231,7 +231,9 @@ async function createOrShowPrDetailWebview(context: vscode.ExtensionContext, prI
             enableScripts: true, // Keep scripts enabled
             // --- IMPORTANT: Update localResourceRoots ---
             // Allow loading from the extension's root directory (covers 'dist', 'media', etc.)
-            localResourceRoots: [ context.extensionUri ],
+            localResourceRoots: [
+                context.extensionUri, // Allows access to root (including 'dist')
+            ],
             // --- End Update ---
              retainContextWhenHidden: true
         }
@@ -290,27 +292,35 @@ async function updateWebviewContent(context: vscode.ExtensionContext, webview: v
         return;
     }
 
-    // 1. Set initial static HTML (contains loading indicator and script tag)
+    // 1. Generate the Icon URI *before* setting HTML
+    const commitIconUri = webview.asWebviewUri(vscode.Uri.joinPath(context.extensionUri, 'icons_svg', 'commit.svg'));
+    console.log(`DEBUG: Commit Icon URI generated for postMessage: ${commitIconUri.toString()}`);
+
+    // 2. Set initial static HTML (still needed to load the script)
+    // Pass prInfo to getWebviewTimelineHtml; it no longer needs the icon URI itself.
     webview.html = await getWebviewTimelineHtml(context, webview, prInfo);
 
-    // 2. Fetch dynamic data
+    // 3. Fetch dynamic data
     console.log(`Workspaceing timeline data for PR #${prInfo.number} to send to webview...`);
     let timelineItems: TimelineItem[] = [];
     try {
-        timelineItems = await fetchPrTimelineData(octokit, prInfo); // Assumes this function handles its own errors and returns [] on failure
+        timelineItems = await fetchPrTimelineData(octokit, prInfo);
     } catch (fetchError) {
          console.error(`Error fetching timeline data for PR #${prInfo.number}:`, fetchError);
-         // Send error notification to webview if fetch fails
          webview.postMessage({ command: 'showError', message: `Error fetching timeline: ${fetchError instanceof Error ? fetchError.message : String(fetchError)}` });
          return;
     }
 
+    // 4. Send data AND the icon URI to the loaded webview script
+    console.log(`Sending <span class="math-inline">${timelineItems.length} timeline items and icon URI to webview for PR #</span>${prInfo.number}`);
+    webview.postMessage({
+        command: 'loadTimeline',
+        data: timelineItems,
+        // --- ADD ICON URI TO PAYLOAD ---
+        iconUri: commitIconUri.toString()
+    });
 
-    // 3. Send data to the loaded webview script
-    console.log(`Sending ${timelineItems.length} timeline items to webview for PR #${prInfo.number}`);
-    webview.postMessage({ command: 'loadTimeline', data: timelineItems });
-
-    // 4. Update internal state for polling etc.
+    // 5. Update internal state for polling etc.
     const activeWebview = activePrDetailPanels.get(prInfo.number);
     if (activeWebview) {
         activeWebview.prInfo = prInfo;
@@ -513,6 +523,91 @@ const diffHunkStyles = `
     .diff-hunk .line-content.context { /* Uses default transparent border */ }
 `;
 
+const commitStyles = `
+    .timeline-item.commit-item {
+    /* Reset some defaults if needed */
+    padding-top: 8px; /* Less padding than comments? */
+    padding-bottom: 8px;
+    margin-bottom: 0; /* Make them appear closer together */
+    border-top: 1px solid var(--vscode-editorWidget-border, #444);
+    }
+    .commit-item .item-header {
+        display: flex;          /* Use flexbox for layout */
+        align-items: center;    /* Align items vertically */
+        gap: 8px;
+        margin-bottom: 0;       /* Remove bottom margin */
+        font-size: var(--vscode-font-size); /* Use standard font size */
+        color: var(--vscode-editor-foreground); /* Standard text color */
+        flex-wrap: nowrap;      /* Prevent wrapping */
+    }
+    /* Part containing author and message title */
+    .commit-item .commit-info {
+        flex-grow: 1;         /* Allow this part to take up space */
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        overflow: hidden;     /* Hide overflow */
+    }
+    .commit-item .commit-info .author {
+        font-weight: normal; /* Make author normal weight */
+        flex-shrink: 0; /* Don't shrink author name */
+    }
+    .commit-item .commit-title {
+        flex-grow: 1;          /* Allow title to take space */
+        white-space: nowrap;   /* Prevent title wrap */
+        overflow: hidden;      /* Hide overflow */
+        text-overflow: ellipsis; /* Add '...' for overflow */
+        opacity: 0.9;          /* Slightly dimmer than author? */
+        margin-left: 5px;
+    }
+    /* Part containing SHA and timestamp */
+    .commit-item .commit-meta {
+        flex-shrink: 0;        /* Don't shrink this part */
+        margin-left: auto;     /* Pushes it to the right */
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 0.9em;      /* Smaller font for meta */
+        color: var(--vscode-descriptionForeground); /* Dimmer color */
+    }
+    .commit-item .commit-meta .commit-sha a,
+    .commit-item .commit-meta .commit-sha code {
+        font-family: var(--vscode-editor-font-family); /* Monospace for SHA */
+        font-size: inherit; /* Inherit smaller size */
+        /* Ensure code styles don't override color */
+        color: var(--vscode-textLink-foreground);
+        background: none;
+        border: none;
+        padding: 0;
+    }
+    .commit-item .commit-meta .timestamp {
+        white-space: nowrap;
+        opacity: 1; /* Reset opacity if inherited */
+        margin-left: 0; /* Reset margin */
+        font-size: inherit; /* Inherit smaller size */
+    }
+
+    .commit-icon-wrapper {
+               display: inline-block; /* Or flex-shrink: 0; if inside flex */
+               width: 16px;
+               height: 16px;
+               margin-right: 5px; /* Space between icon and avatar */
+               vertical-align: text-bottom; /* Align with text */
+               /* Set the color using a theme variable - SVG fill="currentColor" will inherit this */
+               color: var(--vscode-icon-foreground);
+    }
+    .commit-icon-wrapper svg {
+        /* Ensure SVG fills the wrapper */
+        display: block;
+        width: 100%;
+        height: 100%;
+    }
+
+]
+
+    
+`;
+
 // =================================
 // WEBVIEW HTML GENERATION
 // =================================
@@ -527,6 +622,10 @@ async function getWebviewTimelineHtml(
     // URI for the bundled webview script (ensure 'main.js' matches your esbuild output)
     const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(context.extensionUri, 'dist', 'webview', 'main.js'));
 
+    // --- Get URI for Codicon CSS ---
+    //const codiconCssUri = webview.asWebviewUri(vscode.Uri.joinPath(context.extensionUri, 'node_modules', '@vscode', 'codicons', 'dist', 'codicon.css'));
+    // --- End Get URI ---
+
     // Basic HTML structure
     return `<!DOCTYPE html>
     <html lang="en">
@@ -540,6 +639,7 @@ async function getWebviewTimelineHtml(
             ${commonStyles}
             ${markdownStyles}
             ${diffHunkStyles}
+            ${commitStyles}
         </style>
     </head>
     <body>
@@ -549,8 +649,6 @@ async function getWebviewTimelineHtml(
         <div id="timeline-area">
             <p id="loading-indicator">Loading timeline...</p>
         </div>
-
-        {/* Load the single bundled script */}
         <script nonce="${nonce}" src="${scriptUri}"></script>
     </body>
     </html>`;
