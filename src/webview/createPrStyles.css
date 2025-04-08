@@ -50,6 +50,27 @@ textarea {
     border-radius: 2px;
     padding: 4px 6px;
 }
+
+select {
+    /* Apply standard VS Code input styling variables */
+    font-family: var(--vscode-font-family);
+    font-size: var(--vscode-font-size);
+    color: var(--vscode-input-foreground);
+    background-color: var(--vscode-input-background);
+    border: 1px solid var(--vscode-input-border, var(--vscode-editorWidget-border));
+    border-radius: 2px;
+    padding: 4px 6px;
+
+    /* Add dropdown arrow styling if needed (can be tricky cross-browser) */
+    /* appearance: none; */ /* May be needed to remove default arrow before adding custom one */
+}
+
+select:focus {
+    outline: 1px solid var(--vscode-focusBorder);
+    outline-offset: -1px;
+    border-color: var(--vscode-focusBorder);
+}
+
 input[readonly] {
      background-color: var(--vscode-input-background); /* Or slightly different bg */
      opacity: 0.7;

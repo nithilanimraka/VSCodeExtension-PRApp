@@ -12,6 +12,7 @@ interface GitInfo {
     owner?: string;
     repo?: string;
     changedFiles?: ChangedFile[]; // Define ChangedFile below
+    branches?: string[];
 }
 
 // Simple type for changed files (expand as needed)
@@ -23,14 +24,15 @@ interface ChangedFile {
 
 // Define the shape of messages sent TO the webview
 type ToCreatePrWebviewMessage =
-    | { command: 'loadFormData'; data: GitInfo }; // Send initial data
+    | { command: 'loadFormData'; data: GitInfo }; // Includes branches now
 
 // Define the shape of messages sent FROM the webview
 type FromCreatePrWebviewMessage =
     | { command: 'webviewReady' }
     | { command: 'createPrRequest'; data: { base: string; head: string; title: string; body: string; } }
     | { command: 'cancelPr' }
-    | { command: 'getChangedFiles' }; // Webview can request file list
+    | { command: 'getChangedFiles' } // Webview can request file list
+    | { command: 'showError'; text: string };
 
 // --- NEW: Helper function to safely get the Git API ---
 async function getGitApi() {
@@ -152,6 +154,12 @@ export class CreatePrViewProvider implements vscode.WebviewViewProvider {
                     // Maybe clear the form by sending empty data?
                      this.sendDataToWebview({ headBranch: undefined, baseBranch: undefined, changedFiles: [] });
                     break;
+
+                case 'showError':
+                    if (data.text) {
+                        vscode.window.showErrorMessage(data.text); // Show the error using VS Code UI
+                    }
+                    break;
             }
         });
     }
@@ -182,6 +190,27 @@ export class CreatePrViewProvider implements vscode.WebviewViewProvider {
          }
     }
 
+    // ---Method to fetch branches ---
+    private async getRepoBranches(owner: string, repo: string): Promise<string[]> {
+        const octokit = await getOctokit();
+        if (!octokit) {
+            console.error("Octokit not available to fetch branches.");
+            return [];
+        }
+        try {
+            // Use pagination to get all branches if there are more than 100
+            const branches = await octokit.paginate(octokit.repos.listBranches, {
+                owner,
+                repo,
+                per_page: 100,
+            });
+            return branches.map(branch => branch.name);
+        } catch (error) {
+            console.error(`Failed to fetch branches for ${owner}/${repo}:`, error);
+            vscode.window.showErrorMessage(`Failed to fetch branches: ${error instanceof Error ? error.message : String(error)}`);
+            return [];
+        }
+    }
 
     // --- Git Interaction Logic (Use the helper function) ---
     private async getCurrentGitInfo(): Promise<GitInfo> {
@@ -221,9 +250,28 @@ export class CreatePrViewProvider implements vscode.WebviewViewProvider {
             }
         }
 
+        // --- Fetch branches and changed files ---
+        let branches: string[] = [];
+        if (owner && repoName) {
+            branches = await this.getRepoBranches(owner, repoName);
+             // Ensure default base/head are valid branches, adjust if not
+             if (baseBranch && !branches.includes(baseBranch)) {
+                 console.warn(`Default base branch "${baseBranch}" not found in remote branches. Resetting.`);
+                 baseBranch = branches.find(b => b === 'main' || b === 'master') || branches[0]; // Fallback
+             }
+             if (headBranch && !branches.includes(headBranch)) {
+                 console.warn(`Current head branch "${headBranch}" not found in remote branches? This might indicate local-only branch.`);
+                 // Decide how to handle this - maybe disable head selection or show warning
+             }
+        }
+
         const changedFiles = await this.getChangedFilesFromGit(repo); // Pass repo object
 
-        return { headBranch, baseBranch, remoteUrl, owner, repo: repoName, changedFiles };
+        // --- Add console log to check file detection ---
+        console.log(`Detected ${changedFiles.length} changed files in provider:`, changedFiles);
+        // --- End console log ---
+
+        return { headBranch, baseBranch, remoteUrl, owner, repo: repoName, changedFiles, branches };
     }
 
     private async getChangedFilesFromGit(repository?: any): Promise<ChangedFile[]> {
@@ -299,13 +347,17 @@ export class CreatePrViewProvider implements vscode.WebviewViewProvider {
                     <h2>Create Pull Request</h2>
 
                     <div class="form-group">
-                        <label for="base-branch">Base Branch:</label>
-                        <input type="text" id="base-branch" name="base-branch" readonly>
-                        </div>
+                        <label for="base-branch-select">Base Branch:</label>
+                        <select id="base-branch-select" name="base-branch-select" required>
+                            <option value="">Loading branches...</option>
+                        </select>
+                    </div>
 
                     <div class="form-group">
-                        <label for="head-branch">Merge Branch:</label>
-                        <input type="text" id="head-branch" name="head-branch" readonly>
+                    <label for="head-branch-select">Merge Branch:</label>
+                    <select id="head-branch-select" name="head-branch-select" required>
+                        <option value="">Loading branches...</option>
+                        </select>
                     </div>
 
                     <div class="form-group">
