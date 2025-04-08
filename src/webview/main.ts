@@ -315,7 +315,7 @@ type TimelineItem = ReviewTimelineItem | ReviewCommentTimelineItem | IssueCommen
         // Prefer GH user login, fallback to commit author name
         const authorName = escapeHtml(userAuthor?.login || authorInfo?.name || 'unknown');
         // Use commit author date, fallback to committer date might be less accurate for PR view
-        const commitDate = authorInfo?.date ? new Date(authorInfo.date).toLocaleString() : '';
+        const commitDate = authorInfo?.date ? new Date(authorInfo.date).toLocaleDateString() : '';
         // Get the first line of the commit message for the title
         const commitTitle = escapeHtml(commitData.commit.message.split('\n')[0]); // Double BS for JS split
         const fullCommitMessage = escapeHtml(commitData.commit.message); // For tooltip

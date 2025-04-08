@@ -549,7 +549,9 @@ const commitStyles = `
     padding-top: 8px; /* Less padding than comments? */
     padding-bottom: 8px;
     margin-bottom: 0; /* Make them appear closer together */
-    border-top: 1px solid var(--vscode-editorWidget-border, #444);
+    max-width: 80%; 
+    margin-left: auto;
+    margin-right: auto;
     }
     .commit-item .item-header {
         display: flex;          /* Use flexbox for layout */
