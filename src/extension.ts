@@ -17,6 +17,37 @@ type ReviewComment = Endpoints["GET /repos/{owner}/{repo}/pulls/{pull_number}/co
 type Review = Endpoints["GET /repos/{owner}/{repo}/pulls/{pull_number}/reviews"]["response"]["data"][0];
 type CommitListItem = Endpoints["GET /repos/{owner}/{repo}/pulls/{pull_number}/commits"]["response"]["data"][0];
 
+type CheckConclusion = "success" | "failure" | "neutral" | "cancelled" | "skipped" | "timed_out" | "action_required" | null | undefined;
+type CheckStatus = "queued" | "in_progress" | "completed" | null | undefined;
+
+type FromWebviewMessage =
+    | { command: 'webviewReady' }
+    | { command: 'showError'; text: string }
+    | { command: 'alert'; text: string }
+    | { command: 'mergePr'; data: { merge_method: 'merge' | 'squash' | 'rebase' } }
+    | { command: 'addComment'; text: string }
+    | { command: 'closePr' };
+
+interface CheckRun {
+    name: string;
+    status: CheckStatus;
+    conclusion: CheckConclusion;
+    html_url: string | null;
+}
+
+interface StatusContext {
+    context: string;
+    state: "error" | "failure" | "pending" | "success";
+    target_url: string | null;
+    description: string | null;
+}
+
+interface PrDetails {
+    timeline: TimelineItem[];
+    mergeable_state: string; // e.g., 'clean', 'dirty', 'blocked', 'unstable'
+    mergeable: boolean | null;
+}
+
 // --- Timeline Item Structure ---
 interface TimelineItemBase {
     timestamp: Date;
@@ -184,17 +215,90 @@ async function createOrShowPrDetailWebview(context: vscode.ExtensionContext, prI
 
     // Handle messages received FROM the webview
     panel.webview.onDidReceiveMessage(
-        message => {
+        async (message: FromWebviewMessage) => { // Add type annotation
+            const octokit = await getOctokit();
+            if (!octokit) {
+                vscode.window.showErrorMessage("Cannot perform action: GitHub authentication required.");
+                return;
+            }
+            const owner = prInfo.repoOwner;
+            const repo = prInfo.repoName;
+            const pull_number = prInfo.number;
+
             switch (message.command) {
-                case 'alert': // Example command
+                case 'alert':
                     vscode.window.showErrorMessage(message.text);
                     return;
-                 case 'webviewReady': // Received when webview script finishes initializing
-                     console.log(`Webview for PR #${prInfo.number} is ready.`);
-                     // If initial data wasn't sent via updateWebviewContent, you could send it here.
-                     // Example: sendDataToWebview(panel.webview, activeWebview.currentTimeline ?? []);
+                 case 'webviewReady':
+                     console.log(`PR Detail Webview for #${prInfo.number} is ready.`);
+                     // Optional: Send data again if initial load failed? Usually handled by updateWebviewContent
                      return;
-                 // Add more cases here if the webview needs to send other messages
+
+                 case 'mergePr':
+                    const mergeMethod = message.data?.merge_method || 'merge';
+                    try {
+                        vscode.window.showInformationMessage(`Attempting to merge PR #${pull_number} using '${mergeMethod}' method...`);
+                        const response = await octokit.pulls.merge({
+                            owner,
+                            repo,
+                            pull_number,
+                            merge_method: mergeMethod, // Pass the selected method
+                            // Add commit_title / commit_message if desired later
+                        });
+                        if (response.status === 200 && response.data.merged) {
+                            vscode.window.showInformationMessage(`PR #${pull_number} merged successfully using '${mergeMethod}'!`);
+                            // Refresh the webview to show 'merged' state and updated timeline
+                            await updateWebviewContent(context, panel.webview, prInfo);
+                        } else {
+                            vscode.window.showWarningMessage(`PR #${pull_number} could not be merged automatically. Status: ${response.status}. Message: ${response.data.message}`);
+                            // Refresh needed? Maybe, state might have changed slightly.
+                            await updateWebviewContent(context, panel.webview, prInfo);
+                        }
+                    } catch (err: any) {
+                        console.error(`Failed to merge PR #${pull_number}:`, err);
+                        vscode.window.showErrorMessage(`Failed to merge PR: ${err.message || 'Unknown error'}`);
+                        // Refresh to show current state again after failure
+                        await updateWebviewContent(context, panel.webview, prInfo);
+                    }
+                    return; // End mergePr
+
+                 case 'addComment':
+                     try {
+                         await octokit.issues.createComment({
+                             owner,
+                             repo,
+                             issue_number: pull_number, // Use issue_number endpoint for general comments
+                             body: message.text,
+                         });
+                         vscode.window.showInformationMessage(`Comment added to PR #${pull_number}.`);
+                         // Refresh the webview to show the new comment
+                         await updateWebviewContent(context, panel.webview, prInfo);
+                     } catch (err: any) {
+                          console.error(`Failed to add comment to PR #${pull_number}:`, err);
+                          vscode.window.showErrorMessage(`Failed to add comment: ${err.message || 'Unknown error'}`);
+                          // Optional: Refresh even on failure? Probably not needed.
+                     }
+                     return; // End addComment
+
+                 case 'closePr':
+                     try {
+                          vscode.window.showInformationMessage(`Attempting to close PR #${pull_number}...`);
+                          await octokit.pulls.update({
+                              owner,
+                              repo,
+                              pull_number,
+                              state: 'closed',
+                          });
+                          vscode.window.showInformationMessage(`PR #${pull_number} closed.`);
+                          // Refresh the webview to show closed state
+                          await updateWebviewContent(context, panel.webview, prInfo);
+                     } catch (err: any) {
+                           console.error(`Failed to close PR #${pull_number}:`, err);
+                           vscode.window.showErrorMessage(`Failed to close PR: ${err.message || 'Unknown error'}`);
+                           // Refresh to show current state again after failure
+                           await updateWebviewContent(context, panel.webview, prInfo);
+                     }
+                     return; // End closePr
             }
         },
         undefined,
@@ -253,33 +357,68 @@ async function updateWebviewContent(
 
 
     // 3. Fetch the actual timeline data asynchronously.
-    console.log(`[updateWebviewContent] Fetching timeline data for PR #${prInfo.number} to send to webview...`);
-    let timelineItems: TimelineItem[] = []; // Default to empty array
+    console.log(`[updateWebviewContent] Fetching full details for PR #${prInfo.number}...`);
+    let prDetails: PrDetails | null = null;
     try {
-        // fetchPrTimelineData should handle its internal errors and return [] on failure if possible
-        timelineItems = await fetchPrTimelineData(octokit, prInfo);
+        prDetails = await fetchPrFullDetails(octokit, prInfo);
     } catch (fetchError) {
-         console.error(`[updateWebviewContent] Error fetching timeline data for PR #${prInfo.number}:`, fetchError);
-         // Send an error message to the webview script
-         webview.postMessage({ command: 'showError', message: `Error fetching timeline: ${fetchError instanceof Error ? fetchError.message : String(fetchError)}` });
-         // Keep timelineItems as empty array, but continue to update internal state if needed
+         console.error(`[updateWebviewContent] Error fetching full details for PR #${prInfo.number}:`, fetchError);
+         webview.postMessage({ command: 'showError', message: `Error fetching PR details: ${fetchError instanceof Error ? fetchError.message : String(fetchError)}` });
+         // Keep prDetails as null
     }
 
 
     // 4. Send the fetched data (or empty array on error) to the webview script.
     // The webview script's message listener will handle the 'loadTimeline' command.
-    console.log(`[updateWebviewContent] Sending ${timelineItems.length} timeline items to webview for PR #${prInfo.number}`);
-    webview.postMessage({
-        command: 'loadTimeline',
-        data: timelineItems
-        // Note: We are no longer sending icon URI or SVG string here
-    });
+    if (prDetails) {
+        console.log(`[updateWebviewContent] Sending details (timeline: ${prDetails.timeline.length}, mergeable: ${prDetails.mergeable_state}) to webview for PR #${prInfo.number}`);
+        webview.postMessage({
+            command: 'loadDetails',
+            data: prDetails
+        });
+    } else {
+         // Handle case where fetching details completely failed (error already shown)
+         console.log(`[updateWebviewContent] Details fetch failed for PR #${prInfo.number}.`);
+          // Optionally send an empty state message?
+         // webview.postMessage({ command: 'loadDetails', data: { timeline: [], checks: [], mergeable: null, mergeable_state: 'unknown', head_sha: '' } });
+    }
 
-    // 5. Update the internally stored state for this webview (used for polling comparison).
+    // 5. Update internal state for polling (if applicable)
     const activeWebview = activePrDetailPanels.get(prInfo.number);
     if (activeWebview) {
-        activeWebview.prInfo = prInfo; // Update PR info (e.g., if title changed)
-        activeWebview.currentTimeline = timelineItems; // Store the latest data
+        activeWebview.prInfo = prInfo;
+        activeWebview.currentTimeline = prDetails?.timeline; // Update stored timeline
+        // Store other details if needed for polling comparison later
+    }
+}
+
+async function fetchPrFullDetails(octokit: Octokit, prInfo: PullRequestInfo): Promise<PrDetails | null> {
+    const owner = prInfo.repoOwner;
+    const repo = prInfo.repoName;
+    const pull_number = prInfo.number;
+
+    try {
+        // 1. Get core PR data including mergeability
+        // We still need this for merge status and potentially other actions
+        const { data: pullData } = await octokit.pulls.get({ owner, repo, pull_number });
+        // const head_sha = pullData.head.sha; // Not needed if only for checks
+
+        // 2. Get Timeline Data
+        const timeline = await fetchPrTimelineData(octokit, prInfo);
+
+        // 3. REMOVED fetching Checks and Statuses
+
+        return {
+            timeline: timeline,
+            mergeable_state: pullData.mergeable_state,
+            mergeable: pullData.mergeable,
+            // head_sha: head_sha, // Remove if not needed elsewhere
+        };
+
+    } catch (error) {
+        console.error(`Failed to fetch details for PR #${pull_number}:`, error);
+        vscode.window.showErrorMessage(`Failed to fetch PR details: ${error instanceof Error ? error.message : String(error)}`);
+        return null;
     }
 }
 
@@ -288,7 +427,7 @@ async function updateWebviewContent(
 // =================================
 async function fetchPrTimelineData(octokit: Octokit, prInfo: PullRequestInfo): Promise<TimelineItem[]> {
     try {
-           const owner = prInfo.repoOwner;
+        const owner = prInfo.repoOwner;
         const repo = prInfo.repoName;
         const pull_number = prInfo.number;
 
@@ -426,7 +565,6 @@ async function fetchPrTimelineData(octokit: Octokit, prInfo: PullRequestInfo): P
 // =================================
 // WEBVIEW HTML GENERATION
 // =================================
-// --- Simplified getWebviewTimelineHtml ---
 async function getWebviewTimelineHtml(
     context: vscode.ExtensionContext,
     webview: vscode.Webview,
@@ -463,9 +601,46 @@ async function getWebviewTimelineHtml(
         <h1><a href="${prInfo.url}" target="_blank">#${prInfo.number}: ${escapeHtml(prInfo.title)}</a></h1>
         <p>Author: ${escapeHtml(prInfo.author)}</p>
         <hr>
+
+        <div id="pr-status-area" class="pr-status-area">
+            <div id="merge-status" class="status-section loading">Loading merge status...</div>
+
+            <div class="merge-controls"> 
+                 <div class="form-group"> 
+                    <label for="merge-method-select">Merge Method:</label>
+                    <select id="merge-method-select" name="merge-method-select">
+                        <option value="merge">Create a merge commit</option>
+                        <option value="squash">Squash and merge</option>
+                        <option value="rebase">Rebase and merge</option>
+                    </select>
+                 </div>
+                 <button id="confirm-merge-button" class="button merge-button" disabled> 
+                    <span class="codicon codicon-git-merge"></span> Merge pull request
+                 </button>
+            </div>
+
+        </div>
+
+        <hr class="status-timeline-separator">
+
         <div id="timeline-area">
             <p id="loading-indicator">Loading timeline...</p>
         </div>
+
+        <div id="comment-box-area" class="comment-box-area">
+             <hr>
+             <h3>Add a comment</h3>
+             <textarea id="new-comment-text" placeholder="Add your comment here..."></textarea>
+             <div class="comment-box-actions">
+                 <button id="close-button" class="button secondary-button">
+                      <span class="codicon codicon-git-pull-request-closed"></span> Close Pull Request
+                 </button>
+                 <button id="add-comment-button" class="button primary-button">
+                      <span class="codicon codicon-comment"></span> Comment
+                 </button>
+            </div>
+        </div>
+
         <script nonce="${nonce}" src="${scriptUri}"></script>
     </body>
     </html>`;

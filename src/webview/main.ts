@@ -23,12 +23,42 @@ interface ReviewTimelineItem extends TimelineItemBase { type: 'review'; data: Re
 interface ReviewCommentTimelineItem extends TimelineItemBase { type: 'review_comment'; data: ReviewComment }
 interface IssueCommentTimelineItem extends TimelineItemBase { type: 'issue_comment'; data: IssueComment }
 interface CommitTimelineItem extends TimelineItemBase { type: 'commit'; data: CommitListItem }
+
 type TimelineItem = ReviewTimelineItem | ReviewCommentTimelineItem | IssueCommentTimelineItem | CommitTimelineItem;
+
+interface PrDetails {
+    timeline: TimelineItem[]; // Assuming TimelineItem is already defined
+    mergeable_state: string;
+    mergeable: boolean | null;
+}
+// Message type from extension
+type FromExtensionMessage =
+    | { command: 'loadDetails'; data: PrDetails }
+    | { command: 'updateTimeline'; timeline: TimelineItem[] } // Keep if polling only sends timeline
+    | { command: 'showError'; message: string };
+
+// Messages sent FROM webview TO extension
+type FromWebviewMessage =
+    | { command: 'webviewReady' }
+    | { command: 'showError'; text: string }
+    // Add merge_method to mergePr data payload
+    | { command: 'mergePr'; data: { merge_method: 'merge' | 'squash' | 'rebase' } }
+    | { command: 'addComment'; text: string }
+    | { command: 'closePr' };
 
 
 (function() {
     const vscode = acquireVsCodeApi();
     const timelineContainer = document.getElementById('timeline-area');
+
+    const mergeStatusDiv = document.getElementById('merge-status');
+
+    const mergeMethodSelect = document.getElementById('merge-method-select') as HTMLSelectElement | null;
+    const confirmMergeButton = document.getElementById('confirm-merge-button') as HTMLButtonElement | null; 
+
+    const commentTextArea = document.getElementById('new-comment-text') as HTMLTextAreaElement | null;
+    const addCommentButton = document.getElementById('add-comment-button') as HTMLButtonElement | null;
+    const closeButton = document.getElementById('close-button') as HTMLButtonElement | null;
 
     // --- Instantiate Markdown-It ---
     // Ensure markdownit is loaded (check browser console if errors occur)
@@ -42,6 +72,51 @@ type TimelineItem = ReviewTimelineItem | ReviewCommentTimelineItem | IssueCommen
     // --- End Instantiate ---
 
     // --- Helper Functions ---
+
+    function renderMergeStatus(mergeable: boolean | null, state: string) {
+        if (!mergeStatusDiv) return;
+        mergeStatusDiv.classList.remove('loading');
+        mergeStatusDiv.innerHTML = ''; // Clear loading
+
+        let iconClass = 'codicon-question';
+        let text = `Merge status: ${state}`;
+        let statusClass = 'merge-unknown';
+
+        if (mergeable === true && state === 'clean') {
+            iconClass = 'codicon-check';
+            text = 'No conflicts with the base branch.';
+            statusClass = 'merge-clean';
+        } else if (mergeable === false && state === 'dirty') {
+             iconClass = 'codicon-warning';
+             text = 'Conflicts must be resolved before merging.';
+             statusClass = 'merge-dirty';
+        } else if (state === 'blocked') {
+             iconClass = 'codicon-error';
+             text = 'Merging is blocked (e.g., required reviews missing).';
+             statusClass = 'merge-blocked';
+        } else if (state === 'unstable' || state === 'behind') {
+            iconClass = 'codicon-issues'; // Or warning?
+            text = `Merging may be possible, but the branch is ${state}. Consider updating.`;
+            statusClass = 'merge-unstable';
+        } else {
+             text = `Merge status: ${state || 'unknown'}. Mergeability ${mergeable === null ? 'unknown' : mergeable ? 'ok' : 'no'}.`;
+        }
+
+        mergeStatusDiv.className = `status-section ${statusClass}`;
+        mergeStatusDiv.innerHTML = `<span class="codicon ${iconClass}"></span> ${escapeHtml(text)}`;
+
+        // Enable/Disable Merge button based on state
+        if (confirmMergeButton) {
+            const canMerge = mergeable === true && ['clean', 'behind', 'unstable'].includes(state);
+            confirmMergeButton.disabled = !canMerge;
+            confirmMergeButton.title = canMerge ? 'Confirm merging this pull request' : `Cannot merge (State: ${state}, Mergeable: ${mergeable})`;
+            // Optional: Change button text based on disabled state?
+            // confirmMergeButton.innerHTML = canMerge
+            //     ? `<span class="codicon codicon-git-merge"></span> Confirm Merge`
+            //     : `<span class="codicon codicon-git-merge"></span> Cannot Merge`;
+        }
+    }
+
     function escapeHtml(unsafe: any): string {
         if (typeof unsafe !== 'string') return '';
         return unsafe
@@ -389,22 +464,80 @@ type TimelineItem = ReviewTimelineItem | ReviewCommentTimelineItem | IssueCommen
     }
 
     // --- Message Listener ---
-    window.addEventListener('message', event => {
+    window.addEventListener('message', (event: MessageEvent<FromExtensionMessage>) => {
         const message = event.data;
         switch (message.command) {
+            case 'loadDetails':
+                 console.log('Received full PR details:', message.data);
+                 if (timelineContainer) timelineContainer.innerHTML = ''; // Clear loading indicator
+                 renderTimeline(message.data.timeline || []);
+                 renderMergeStatus(message.data.mergeable, message.data.mergeable_state);
+                // TODO: Enable/disable merge button based on mergeable/state
+                break;
+
             case 'updateTimeline':
                 renderTimeline(message.timeline);
                 break;
-            case 'loadTimeline': // Handle initial load
-                console.log('Received initial timeline data from extension:', message.data);
-                renderTimeline(message.data);
-                break;
+                
             case 'showError':
                 if (timelineContainer) {
                     timelineContainer.innerHTML = `<p style="color: var(--vscode-errorForeground);">${escapeHtml(message.message)}</p>`;
                 }
                 break;
         }
+    });
+
+    // Merge Button
+    confirmMergeButton?.addEventListener('click', () => { // Use new button ID
+        if (confirmMergeButton.disabled || !mergeMethodSelect) return; // Also check select exists
+
+        const selectedMethod = mergeMethodSelect.value as 'merge' | 'squash' | 'rebase'; // Get selected method
+
+        if (!selectedMethod) {
+             console.error("No merge method selected"); // Should have a default
+             return;
+        }
+
+        confirmMergeButton.disabled = true; // Disable button
+        confirmMergeButton.innerHTML = `<span class="codicon codicon-sync spin"></span> Merging...`;
+
+        // Send selected method in the message data
+        vscode.postMessage({ command: 'mergePr', data: { merge_method: selectedMethod } });
+    });
+
+    // Add Comment Button
+    addCommentButton?.addEventListener('click', () => {
+        if (!commentTextArea || addCommentButton?.disabled) return;
+        const commentText = commentTextArea.value.trim();
+        if (!commentText) return; // Don't send empty comments
+
+        addCommentButton.disabled = true;
+        addCommentButton.innerHTML = `<span class="codicon codicon-sync spin"></span> Posting...`;
+        commentTextArea.disabled = true; // Disable textarea while posting
+
+        vscode.postMessage({ command: 'addComment', text: commentText });
+
+        // Clear textarea and re-enable button after a short delay (or wait for confirmation?)
+        // For now, just clear and re-enable optimistically after sending
+        setTimeout(() => {
+             if (commentTextArea) {
+                  commentTextArea.value = '';
+                  commentTextArea.disabled = false;
+             }
+             if(addCommentButton) {
+                 addCommentButton.disabled = false;
+                 addCommentButton.innerHTML = `<span class="codicon codicon-comment"></span> Comment`;
+             }
+        }, 1000); // Adjust delay as needed
+    });
+
+    // Close Button
+    closeButton?.addEventListener('click', () => {
+         if (closeButton?.disabled) return;
+         closeButton.disabled = true;
+         if (confirmMergeButton) confirmMergeButton.disabled = true; // Disable merge too
+         closeButton.innerHTML = `<span class="codicon codicon-sync spin"></span> Closing...`;
+         vscode.postMessage({ command: 'closePr' });
     });
 
     // Signal readiness to extension host

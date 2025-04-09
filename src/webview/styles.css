@@ -1,58 +1,58 @@
 /* Common Styles */
-    body { font-family: var(--vscode-font-family); color: var(--vscode-editor-foreground); background-color: var(--vscode-editor-background); padding: 15px 25px; }
-    #timeline-area { margin-top: 20px; }
-    #loading-indicator { padding: 10px; font-style: italic; opacity: 0.8; }
-    a { color: var(--vscode-textLink-foreground); text-decoration: none; }
-    a:hover { text-decoration: underline; }
-    hr { border: none; border-top: 1px solid var(--vscode-editorWidget-border, #444); margin: 15px 0; }
-    code { font-family: var(--vscode-editor-font-family); font-size: calc(var(--vscode-editor-font-size) * 0.9); background-color: var(--vscode-textBlockQuote-background); border: 1px solid var(--vscode-button-secondaryBackground); border-radius: 3px; padding: 0.1em 0.3em; }
-    .timeline-item { margin-bottom: 16px; padding-top: 16px; border-top: 1px solid var(--vscode-editorWidget-border, #444); }
-    .timeline-item:first-child { border-top: none; padding-top: 0; }
-    .item-header { margin-bottom: 8px; display: flex; align-items: center; gap: 8px; font-size: 0.9em; color: var(--vscode-descriptionForeground); flex-wrap: wrap; }
-    .item-header .author { font-weight: bold; color: var(--vscode-editor-foreground); }
-    .timestamp { font-size: 0.9em; white-space: nowrap; opacity: 0.8; margin-left: auto; }
-    .file-path { font-family: var(--vscode-editor-font-family); background-color: var(--vscode-textBlockQuote-background); padding: 1px 4px; border-radius: 3px; border: 1px solid var(--vscode-button-secondaryBackground); }
-    .gh-link { margin-left: 5px; font-size: 0.9em; opacity: 0.7; }
-    .gh-link:hover { opacity: 1; }
-    .avatar { border-radius: 50%; vertical-align: middle; border: 1px solid var(--vscode-editorWidget-border, #444); width: 20px; height: 20px; }
-    .avatar-placeholder { display: inline-block; width: 20px; height: 20px; background-color: var(--vscode-editorWidget-border); border-radius: 50%; vertical-align: middle; }
-    .comment-body { padding: 5px 0; margin-left: 28px; margin-top: -5px; line-height: 1.4; }
-    .comment-body p:first-child { margin-top: 0; }
-    .comment-body p:last-child { margin-bottom: 0; }
-    .review-state { font-weight: bold; padding: 1px 4px; border-radius: 3px; font-size: 0.9em; }
-    .review-state.approved { color: var(--vscode-gitDecoration-addedResourceForeground); background-color: rgba(47, 131, 47, 0.15); }
-    .review-state.commented { color: var(--vscode-descriptionForeground); background-color: var(--vscode-textBlockQuote-background); }
-    .review-state.changes_requested { color: var(--vscode-gitDecoration-modifiedResourceForeground); background-color: rgba(188, 76, 0, 0.15); }
-    .review-state.dismissed { color: var(--vscode-descriptionForeground); background-color: var(--vscode-textBlockQuote-background); text-decoration: line-through; }
-    .commit-item .item-header { gap: 5px; }
-    .commit-message { margin-left: 28px; margin-top: -5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .commit-item code { font-size: 0.85em; }
-    /* Add .line-range style */
-    .line-range { opacity: 0.8; margin-left: 5px; font-size: 0.95em; }
+body { font-family: var(--vscode-font-family); color: var(--vscode-editor-foreground); background-color: var(--vscode-editor-background); padding: 15px 25px; }
+#timeline-area { margin-top: 20px; }
+#loading-indicator { padding: 10px; font-style: italic; opacity: 0.8; }
+a { color: var(--vscode-textLink-foreground); text-decoration: none; }
+a:hover { text-decoration: underline; }
+hr { border: none; border-top: 1px solid var(--vscode-editorWidget-border, #444); margin: 15px 0; }
+code { font-family: var(--vscode-editor-font-family); font-size: calc(var(--vscode-editor-font-size) * 0.9); background-color: var(--vscode-textBlockQuote-background); border: 1px solid var(--vscode-button-secondaryBackground); border-radius: 3px; padding: 0.1em 0.3em; }
+.timeline-item { margin-bottom: 16px; padding-top: 16px; border-top: 1px solid var(--vscode-editorWidget-border, #444); }
+.timeline-item:first-child { border-top: none; padding-top: 0; }
+.item-header { margin-bottom: 8px; display: flex; align-items: center; gap: 8px; font-size: 0.9em; color: var(--vscode-descriptionForeground); flex-wrap: wrap; }
+.item-header .author { font-weight: bold; color: var(--vscode-editor-foreground); }
+.timestamp { font-size: 0.9em; white-space: nowrap; opacity: 0.8; margin-left: auto; }
+.file-path { font-family: var(--vscode-editor-font-family); background-color: var(--vscode-textBlockQuote-background); padding: 1px 4px; border-radius: 3px; border: 1px solid var(--vscode-button-secondaryBackground); }
+.gh-link { margin-left: 5px; font-size: 0.9em; opacity: 0.7; }
+.gh-link:hover { opacity: 1; }
+.avatar { border-radius: 50%; vertical-align: middle; border: 1px solid var(--vscode-editorWidget-border, #444); width: 20px; height: 20px; }
+.avatar-placeholder { display: inline-block; width: 20px; height: 20px; background-color: var(--vscode-editorWidget-border); border-radius: 50%; vertical-align: middle; }
+.comment-body { padding: 5px 0; margin-left: 28px; margin-top: -5px; line-height: 1.4; }
+.comment-body p:first-child { margin-top: 0; }
+.comment-body p:last-child { margin-bottom: 0; }
+.review-state { font-weight: bold; padding: 1px 4px; border-radius: 3px; font-size: 0.9em; }
+.review-state.approved { color: var(--vscode-gitDecoration-addedResourceForeground); background-color: rgba(47, 131, 47, 0.15); }
+.review-state.commented { color: var(--vscode-descriptionForeground); background-color: var(--vscode-textBlockQuote-background); }
+.review-state.changes_requested { color: var(--vscode-gitDecoration-modifiedResourceForeground); background-color: rgba(188, 76, 0, 0.15); }
+.review-state.dismissed { color: var(--vscode-descriptionForeground); background-color: var(--vscode-textBlockQuote-background); text-decoration: line-through; }
+.commit-item .item-header { gap: 5px; }
+.commit-message { margin-left: 28px; margin-top: -5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.commit-item code { font-size: 0.85em; }
+/* Add .line-range style */
+.line-range { opacity: 0.8; margin-left: 5px; font-size: 0.95em; }
 
 
 /* Markdown Styles */
-    .comment-body strong { font-weight: var(--vscode-markdown-bold-font-weight, bold); }
-    .comment-body em { font-style: italic; }
-    .comment-body blockquote { background: var(--vscode-textBlockQuote-background); border-left: 5px solid var(--vscode-textBlockQuote-border); margin: 5px 0 5px 5px; padding: 5px 10px; }
-    .comment-body ul, .comment-body ol { margin-left: 25px; margin-top: 5px; margin-bottom: 5px; }
-    .comment-body pre { font-family: var(--vscode-editor-font-family); font-size: var(--vscode-editor-font-size); line-height: var(--vscode-editor-line-height); background-color: var(--vscode-textBlockQuote-background); padding: 10px; border: 1px solid var(--vscode-editorWidget-border, #444); border-radius: 4px; overflow-x: auto; margin: 5px 0; }
-    .comment-body :not(pre)>code { font-family: var(--vscode-editor-font-family); font-size: calc(var(--vscode-editor-font-size) * 0.9); background-color: var(--vscode-textBlockQuote-background); border: 1px solid var(--vscode-button-secondaryBackground); border-radius: 3px; padding: 0.1em 0.3em; }
+.comment-body strong { font-weight: var(--vscode-markdown-bold-font-weight, bold); }
+.comment-body em { font-style: italic; }
+.comment-body blockquote { background: var(--vscode-textBlockQuote-background); border-left: 5px solid var(--vscode-textBlockQuote-border); margin: 5px 0 5px 5px; padding: 5px 10px; }
+.comment-body ul, .comment-body ol { margin-left: 25px; margin-top: 5px; margin-bottom: 5px; }
+.comment-body pre { font-family: var(--vscode-editor-font-family); font-size: var(--vscode-editor-font-size); line-height: var(--vscode-editor-line-height); background-color: var(--vscode-textBlockQuote-background); padding: 10px; border: 1px solid var(--vscode-editorWidget-border, #444); border-radius: 4px; overflow-x: auto; margin: 5px 0; }
+.comment-body :not(pre)>code { font-family: var(--vscode-editor-font-family); font-size: calc(var(--vscode-editor-font-size) * 0.9); background-color: var(--vscode-textBlockQuote-background); border: 1px solid var(--vscode-button-secondaryBackground); border-radius: 3px; padding: 0.1em 0.3em; }
 
 /* Diff Hunk styles */
-    .diff-hunk { border: 1px solid var(--vscode-editorWidget-border, #ccc); border-radius: 4px; margin-bottom: 8px; overflow-x: auto; }
-    .diff-hunk pre { margin: 0; padding: 0; background-color: var(--vscode-editor-background); border-radius: 4px; }
-    .diff-hunk .line { display: flex; white-space: nowrap; margin: 0; padding: 0; }
-    .diff-hunk .line-num { flex-shrink: 0; width: 45px; padding-right: 10px; text-align: right; opacity: 0.7; user-select: none; color: var(--vscode-editorLineNumber-foreground); font-family: var(--vscode-editor-font-family); font-size: var(--vscode-editor-font-size); line-height: var(--vscode-editor-line-height); margin: 0; padding: 0 10px 0 0; }
-    .diff-hunk .line.hunk-header .line-num { opacity: 0.5; }
-    .diff-hunk .line-content { flex-grow: 1; white-space: pre; font-family: var(--vscode-editor-font-family); font-size: var(--vscode-editor-font-size); line-height: var(--vscode-editor-line-height); margin: 0; padding-top: 0; padding-bottom: 0; border-left: 3px solid transparent; padding-left: 10px; }
-    .diff-hunk .line-content.addition { background-color: rgba(47, 131, 47, 0.15); border-left-color: var(--vscode-gitDecoration-addedResourceForeground); }
-    .diff-hunk .line-content.deletion { background-color: rgba(188, 76, 0, 0.15); border-left-color: var(--vscode-gitDecoration-deletedResourceForeground); }
-    .diff-hunk .line-content.hunk-header { color: var(--vscode-descriptionForeground); background-color: var(--vscode-textBlockQuote-background); padding: 2px 10px; font-style: italic; border-left: none; }
+.diff-hunk { border: 1px solid var(--vscode-editorWidget-border, #ccc); border-radius: 4px; margin-bottom: 8px; overflow-x: auto; }
+.diff-hunk pre { margin: 0; padding: 0; background-color: var(--vscode-editor-background); border-radius: 4px; }
+.diff-hunk .line { display: flex; white-space: nowrap; margin: 0; padding: 0; }
+.diff-hunk .line-num { flex-shrink: 0; width: 45px; padding-right: 10px; text-align: right; opacity: 0.7; user-select: none; color: var(--vscode-editorLineNumber-foreground); font-family: var(--vscode-editor-font-family); font-size: var(--vscode-editor-font-size); line-height: var(--vscode-editor-line-height); margin: 0; padding: 0 10px 0 0; }
+.diff-hunk .line.hunk-header .line-num { opacity: 0.5; }
+.diff-hunk .line-content { flex-grow: 1; white-space: pre; font-family: var(--vscode-editor-font-family); font-size: var(--vscode-editor-font-size); line-height: var(--vscode-editor-line-height); margin: 0; padding-top: 0; padding-bottom: 0; border-left: 3px solid transparent; padding-left: 10px; }
+.diff-hunk .line-content.addition { background-color: rgba(47, 131, 47, 0.15); border-left-color: var(--vscode-gitDecoration-addedResourceForeground); }
+.diff-hunk .line-content.deletion { background-color: rgba(188, 76, 0, 0.15); border-left-color: var(--vscode-gitDecoration-deletedResourceForeground); }
+.diff-hunk .line-content.hunk-header { color: var(--vscode-descriptionForeground); background-color: var(--vscode-textBlockQuote-background); padding: 2px 10px; font-style: italic; border-left: none; }
 
 
 /* Commit Styles */
-    .timeline-item.commit-item {
+.timeline-item.commit-item {
     /* Reset some defaults if needed */
     padding-top: 8px; /* Less padding than comments? */
     padding-bottom: 8px;
@@ -60,67 +60,246 @@
     max-width: 80%; 
     margin-left: auto;
     margin-right: auto;
-    }
-    .commit-item .item-header {
-        display: flex;          /* Use flexbox for layout */
-        align-items: center;    /* Align items vertically */
-        gap: 8px;
-        margin-bottom: 0;       /* Remove bottom margin */
-        font-size: var(--vscode-font-size); /* Use standard font size */
-        color: var(--vscode-editor-foreground); /* Standard text color */
-        flex-wrap: nowrap;      /* Prevent wrapping */
-    }
-    /* Part containing author and message title */
-    .commit-item .commit-info {
-        flex-grow: 1;         /* Allow this part to take up space */
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        overflow: hidden;     /* Hide overflow */
-    }
-    .commit-item .commit-info .author {
-        font-weight: normal; /* Make author normal weight */
-        flex-shrink: 0; /* Don't shrink author name */
-    }
-    .commit-item .commit-title {
-        flex-grow: 1;          /* Allow title to take space */
-        white-space: nowrap;   /* Prevent title wrap */
-        overflow: hidden;      /* Hide overflow */
-        text-overflow: ellipsis; /* Add '...' for overflow */
-        opacity: 0.9;          /* Slightly dimmer than author? */
-        margin-left: 5px;
-    }
-    /* Part containing SHA and timestamp */
-    .commit-item .commit-meta {
-        flex-shrink: 0;        /* Don't shrink this part */
-        margin-left: auto;     /* Pushes it to the right */
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        font-size: 0.9em;      /* Smaller font for meta */
-        color: var(--vscode-descriptionForeground); /* Dimmer color */
-    }
-    .commit-item .commit-meta .commit-sha a,
-    .commit-item .commit-meta .commit-sha code {
-        font-family: var(--vscode-editor-font-family); /* Monospace for SHA */
-        font-size: inherit; /* Inherit smaller size */
-        /* Ensure code styles don't override color */
-        color: var(--vscode-textLink-foreground);
-        background: none;
-        border: none;
-        padding: 0;
-    }
-    .commit-item .commit-meta .timestamp {
-        white-space: nowrap;
-        opacity: 1; /* Reset opacity if inherited */
-        margin-left: 0; /* Reset margin */
-        font-size: inherit; /* Inherit smaller size */
-    }
+}
+.commit-item .item-header {
+    display: flex;          /* Use flexbox for layout */
+    align-items: center;    /* Align items vertically */
+    gap: 8px;
+    margin-bottom: 0;       /* Remove bottom margin */
+    font-size: var(--vscode-font-size); /* Use standard font size */
+    color: var(--vscode-editor-foreground); /* Standard text color */
+    flex-wrap: nowrap;      /* Prevent wrapping */
+}
+/* Part containing author and message title */
+.commit-item .commit-info {
+    flex-grow: 1;         /* Allow this part to take up space */
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    overflow: hidden;     /* Hide overflow */
+}
+.commit-item .commit-info .author {
+    font-weight: normal; /* Make author normal weight */
+    flex-shrink: 0; /* Don't shrink author name */
+}
+.commit-item .commit-title {
+    flex-grow: 1;          /* Allow title to take space */
+    white-space: nowrap;   /* Prevent title wrap */
+    overflow: hidden;      /* Hide overflow */
+    text-overflow: ellipsis; /* Add '...' for overflow */
+    opacity: 0.9;          /* Slightly dimmer than author? */
+    margin-left: 5px;
+}
+/* Part containing SHA and timestamp */
+.commit-item .commit-meta {
+    flex-shrink: 0;        /* Don't shrink this part */
+    margin-left: auto;     /* Pushes it to the right */
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.9em;      /* Smaller font for meta */
+    color: var(--vscode-descriptionForeground); /* Dimmer color */
+}
+.commit-item .commit-meta .commit-sha a,
+.commit-item .commit-meta .commit-sha code {
+    font-family: var(--vscode-editor-font-family); /* Monospace for SHA */
+    font-size: inherit; /* Inherit smaller size */
+    /* Ensure code styles don't override color */
+    color: var(--vscode-textLink-foreground);
+    background: none;
+    border: none;
+    padding: 0;
+}
+.commit-item .commit-meta .timestamp {
+    white-space: nowrap;
+    opacity: 1; /* Reset opacity if inherited */
+    margin-left: 0; /* Reset margin */
+    font-size: inherit; /* Inherit smaller size */
+}
 
-    .commit-info .codicon { /* Target codicons within commit-info */
-        vertical-align: text-bottom; /* Align icon */
-        margin-right: 5px;      /* Space after icon */
-        /* Color is usually inherited or set by codicon.css based on theme */
-        /* You could force it if needed: color: var(--vscode-icon-foreground); */
-    }
+.commit-info .codicon { /* Target codicons within commit-info */
+    vertical-align: text-bottom; /* Align icon */
+    margin-right: 5px;      /* Space after icon */
+    /* Color is usually inherited or set by codicon.css based on theme */
+    /* You could force it if needed: color: var(--vscode-icon-foreground); */
+}
 
+/* --- Status Area Styles --- */
+.pr-status-area {
+    padding: 10px 15px;
+    margin-bottom: 10px;
+    border: 1px solid var(--vscode-editorWidget-border, #444);
+    border-radius: 4px;
+    background-color: var(--vscode-sideBar-background, var(--vscode-editorWidget-background)); /* Use sidebar or widget background */
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.status-section {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 0;
+}
+.status-section .codicon {
+    font-size: 1.2em; /* Make status icons slightly larger */
+}
+
+.status-section.loading {
+    color: var(--vscode-descriptionForeground);
+    font-style: italic;
+}
+
+
+/* Merge status styling */
+.merge-clean .codicon { color: var(--vscode-gitDecoration-addedResourceForeground); }
+.merge-dirty .codicon { color: var(--vscode-testing-iconFailed, var(--vscode-gitDecoration-conflictingResourceForeground)); } /* Conflict/warning */
+.merge-blocked .codicon { color: var(--vscode-errorForeground); }
+.merge-unstable .codicon { color: var(--vscode-list-warningForeground); }
+.merge-unknown .codicon { color: var(--vscode-descriptionForeground); }
+
+.merge-controls {
+    display: flex;
+    align-items: flex-end; /* Align items to bottom */
+    gap: 10px; /* Space between select group and button */
+    margin-top: 10px; /* Space above controls */
+    flex-wrap: wrap; /* Allow wrapping on smaller widths */
+}
+
+.merge-controls .form-group {
+    margin-bottom: 0; /* Remove bottom margin if form-group has it */
+}
+
+.merge-controls label { /* Style for the 'Merge Method:' label */
+     margin-bottom: 8px; /* Add a little space below label */
+     display: block; /* Ensure it takes its own line */
+     color: var(--vscode-descriptionForeground);
+}
+
+
+/* Ensure select dropdown uses theme colors */
+.merge-controls select {
+    font-family: var(--vscode-font-family);
+    font-size: var(--vscode-font-size);
+    color: var(--vscode-input-foreground);
+    background-color: var(--vscode-input-background);
+    border: 1px solid var(--vscode-input-border, var(--vscode-editorWidget-border));
+    border-radius: 2px;
+    padding: 4px 6px;
+    width: auto; 
+    min-width: 180px; /* Set a minimum reasonable width */
+    max-width: 300px; /* Prevent it from getting too wide */
+    box-sizing: border-box;
+}
+.merge-controls select:focus {
+     outline: 1px solid var(--vscode-focusBorder);
+     outline-offset: -1px;
+     border-color: var(--vscode-focusBorder);
+}
+
+
+/* Style the confirmation button */
+#confirm-merge-button {
+    /* Inherits .button style, adjust if needed */
+    /* Example: Add margin if wrapping occurs */
+     /* margin-top: 5px; */
+     flex-shrink: 0; /* Prevent button shrinking */
+}
+
+.status-timeline-separator {
+    margin-top: 0; /* Reduce space after status area */
+    margin-bottom: 20px;
+}
+
+/* --- Action Buttons Styles --- */
+.action-buttons {
+    margin-top: 10px; /* Space above merge button */
+}
+
+.button { /* Common button styles */
+    background-color: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
+    border: 1px solid var(--vscode-button-border, transparent);
+    padding: 6px 12px;
+    border-radius: 2px;
+    cursor: pointer;
+    font-size: var(--vscode-font-size);
+    display: inline-flex; /* Align icon and text */
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+.button:hover {
+    background-color: var(--vscode-button-hoverBackground);
+}
+.button:focus {
+    outline: 1px solid var(--vscode-focusBorder);
+    outline-offset: 1px;
+}
+.button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+.button .codicon {
+    vertical-align: middle;
+}
+
+/* Specific button styles */
+.merge-button {
+    /* Default button already looks like primary, maybe make it green? */
+    /* background-color: var(--vscode-testing-iconPassed, #238636); */ /* Example Green */
+}
+.primary-button {
+    /* Standard primary button style (often default) */
+}
+.secondary-button {
+    background-color: var(--vscode-button-secondaryBackground);
+    color: var(--vscode-button-secondaryForeground);
+    border-color: var(--vscode-button-secondaryBorder, var(--vscode-button-border, transparent));
+}
+.secondary-button:hover {
+     background-color: var(--vscode-button-secondaryHoverBackground);
+}
+
+
+/* --- Comment Area Styles --- */
+.comment-box-area {
+    margin-top: 25px;
+    padding-top: 15px;
+    /* border-top: 1px solid var(--vscode-editorWidget-border, #444); */ /* Or use the <hr> */
+}
+.comment-box-area h3 {
+    margin: 0 0 10px 0;
+    font-size: 1.1em;
+}
+.comment-box-area textarea {
+    width: 100%;
+    box-sizing: border-box;
+    margin-bottom: 10px;
+    font-family: var(--vscode-font-family);
+    font-size: var(--vscode-font-size);
+    color: var(--vscode-input-foreground);
+    background-color: var(--vscode-input-background);
+    border: 1px solid var(--vscode-input-border, var(--vscode-editorWidget-border));
+    border-radius: 2px;
+    padding: 8px 10px;
+    min-height: 80px;
+    resize: vertical;
+}
+.comment-box-area textarea:focus {
+    outline: 1px solid var(--vscode-focusBorder);
+    outline-offset: -1px;
+    border-color: var(--vscode-focusBorder);
+}
+.comment-box-area textarea:disabled {
+     opacity: 0.6;
+     background-color: var(--vscode-input-disabledBackground, var(--vscode-input-background));
+}
+
+
+.comment-box-actions {
+    display: flex;
+    justify-content: flex-end; /* Align buttons right */
+    gap: 10px;
+}

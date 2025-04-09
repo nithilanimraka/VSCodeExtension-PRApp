@@ -181,7 +181,6 @@ export class PrDataProvider implements vscode.TreeDataProvider<vscode.TreeItem> 
         vscode.window.showWarningMessage("Could not determine GitHub repository origin.");
         return undefined;
      }
-     // --- End Helper ---
 }
 
 // --- Tree Item Classes ---

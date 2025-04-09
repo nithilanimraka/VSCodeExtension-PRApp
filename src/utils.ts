@@ -1,4 +1,4 @@
-// Helper function (move to a utils.ts file eventually)
+// Helper function 
 export function getNonce() {
     let text = '';
     const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
