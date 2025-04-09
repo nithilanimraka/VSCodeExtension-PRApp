@@ -93,56 +93,114 @@ textarea {
 
 /* Files List */
 .files-list {
-    max-height: 150px; /* Limit height and add scroll */
+    max-height: 200px; /* Adjust height as needed */
     overflow-y: auto;
     border: 1px solid var(--vscode-input-border, var(--vscode-editorWidget-border));
     border-radius: 2px;
     padding: 5px;
-    background-color: var(--vscode-input-background); /* Match input background */
+    background-color: var(--vscode-input-background);
 }
-.files-list p {
+.files-list p { /* Style for 'No changes' message */
     margin: 0;
     padding: 5px;
     font-style: italic;
     color: var(--vscode-descriptionForeground);
 }
-.files-list ul {
+
+/* Style the UL inside the list */
+.file-list-ul {
     list-style: none;
     padding: 0;
     margin: 0;
 }
-.files-list li {
+
+/* Style each List Item using Flexbox */
+.file-list-item {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 2px 4px;
-    font-size: 0.95em;
+    gap: 6px; /* Space between icon, name, status */
+    padding: 3px 4px;
+    font-size: var(--vscode-font-size); /* Use standard editor font size */
+    border-radius: 2px; /* Optional: subtle rounding on hover */
+}
+.file-list-item:hover {
+     background-color: var(--vscode-list-hoverBackground); /* Subtle hover */
+}
+
+
+/* Style the File Icon */
+.file-icon {
+    /* Inherit color or set explicitly */
+    /* color: var(--vscode-icon-foreground); */
+    flex-shrink: 0; /* Prevent icon from shrinking */
+    /* font-size: 1.1em; */ /* Adjust size if needed */
+}
+
+/* Style the File Path */
+.file-path {
+    flex-grow: 1; /* Allow path to take up available space */
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    /* color: var(--vscode-foreground); */ /* Default text color */
 }
 
-.file-status {
-     font-family: var(--vscode-editor-font-family); /* Monospace often looks good */
-     font-weight: bold;
-     padding: 0 4px;
-     border-radius: 2px;
-     font-size: 0.9em;
-     min-width: 1.5em; /* Ensure consistent width */
-     text-align: center;
+/* Style the File Path based on parent LI status class */
+.file-list-item.status-a .file-path {
+    color: var(--vscode-gitDecoration-addedResourceForeground);
 }
-/* Style based on status */
+.file-list-item.status-m .file-path {
+    color: var(--vscode-gitDecoration-modifiedResourceForeground);
+}
+.file-list-item.status-d .file-path {
+    color: var(--vscode-gitDecoration-deletedResourceForeground);
+}
+.file-list-item.status-r .file-path {
+    color: var(--vscode-gitDecoration-renamedResourceForeground);
+}
+.file-list-item.status-c .file-path {
+    color: var(--vscode-gitDecoration-submoduleResourceForeground); 
+}
+.file-list-item.status-\? .file-path { 
+    color: var(--vscode-gitDecoration-untrackedResourceForeground);
+}
+
+.file-list-item.status-i .file-path {
+    color: var(--vscode-gitDecoration-ignoredResourceForeground);
+} 
+
+.file-list-item.status-conflict .file-path {
+    color: var(--vscode-gitDecoration-conflictingResourceForeground);
+} 
+
+/* Style the Status Character (right-aligned) */
+.file-status {
+    font-family: var(--vscode-editor-font-family);
+    font-weight: bold;
+    padding: 1px 5px; /* Adjust padding */
+    border-radius: 3px; /* More rounded */
+    font-size: 0.9em;
+    text-align: center;
+    margin-left: auto; /* Pushes status to the far right in flex container */
+    flex-shrink: 0; /* Prevent status from shrinking */
+    min-width: 1.8em; /* Ensure minimum width for alignment */
+}
+/* Colors using more standard VS Code Git decoration variables */
+.file-status-a { color: var(--vscode-gitDecoration-addedResourceForeground); }
+.file-status-m { color: var(--vscode-gitDecoration-modifiedResourceForeground); }
+.file-status-d { color: var(--vscode-gitDecoration-deletedResourceForeground); }
+.file-status-r { color: var(--vscode-gitDecoration-renamedResourceForeground); }
+.file-status-c { color: var(--vscode-gitDecoration-submoduleResourceForeground); } /* Copied isn't standard git, using submodule */
+.file-status-\? { color: var(--vscode-gitDecoration-untrackedResourceForeground); }
+/* Remove background colors if you just want text color like screenshot */
+/* Background versions (keep if preferred):
 .file-status-a { color: var(--vscode-gitDecoration-addedResourceForeground); background-color: rgba(47, 131, 47, 0.15); }
 .file-status-m { color: var(--vscode-gitDecoration-modifiedResourceForeground); background-color: rgba(188, 76, 0, 0.15); }
 .file-status-d { color: var(--vscode-gitDecoration-deletedResourceForeground); background-color: rgba(171, 41, 41, 0.15); }
 .file-status-r { color: var(--vscode-gitDecoration-renamedResourceForeground); background-color: rgba(58, 106, 173, 0.15); }
 .file-status-c { color: var(--vscode-gitDecoration-submoduleResourceForeground); background-color: rgba(100, 100, 100, 0.15); }
-.file-status-\? { color: var(--vscode-gitDecoration-untrackedResourceForeground); background-color: rgba(117, 185, 56, 0.15); }
-
-.file-path {
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
+.file-status-? { color: var(--vscode-gitDecoration-untrackedResourceForeground); background-color: rgba(117, 185, 56, 0.15); }
+*/
 
 
 /* Button Group */

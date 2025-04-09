@@ -144,6 +144,30 @@ declare const acquireVsCodeApi: () => VsCodeApi;
         // headBranchInput.value = '';
     });
 
+    // --- NEW: Helper Function to get Codicon class based on filename ---
+    function getCodiconNameForFile(filename: string): string {
+        const lowerFilename = filename.toLowerCase();
+        // Use more semantic codicons where available
+        if (lowerFilename.endsWith('.py')) return 'codicon-file-code'; // General code icon
+        if (lowerFilename.endsWith('.js')) return 'codicon-file-code';
+        if (lowerFilename.endsWith('.ts')) return 'codicon-file-code';
+        if (lowerFilename.endsWith('.java')) return 'codicon-file-code';
+        if (lowerFilename.endsWith('.cs')) return 'codicon-file-code';
+        if (lowerFilename.endsWith('.html')) return 'codicon-file-code'; // Or 'codicon-globe' maybe?
+        if (lowerFilename.endsWith('.css')) return 'codicon-file-code'; // Or 'codicon-paintcan'?
+        if (lowerFilename.endsWith('.json')) return 'codicon-json';
+        if (lowerFilename.endsWith('.md')) return 'codicon-markdown';
+        if (lowerFilename.endsWith('.txt')) return 'codicon-file-text';
+        if (lowerFilename.includes('requirements')) return 'codicon-checklist'; // Checklist icon seems appropriate
+        if (lowerFilename.includes('dockerfile')) return 'codicon-docker';
+        if (lowerFilename.includes('config') || lowerFilename.endsWith('.yml') || lowerFilename.endsWith('.yaml')) return 'codicon-settings-gear'; // Gear icon
+        if (lowerFilename.endsWith('.git') || lowerFilename.includes('gitignore') || lowerFilename.includes('gitattributes')) return 'codicon-git-commit'; // Git icon
+        if (lowerFilename.endsWith('.png') || lowerFilename.endsWith('.jpg') || lowerFilename.endsWith('.jpeg') || lowerFilename.endsWith('.gif') || lowerFilename.endsWith('.svg')) return 'codicon-file-media'; // Media icon
+
+        // Default icon
+        return 'codicon-file';
+    }
+
 
     // --- Rendering Functions ---
 
@@ -192,47 +216,52 @@ declare const acquireVsCodeApi: () => VsCodeApi;
 
     // Ensure renderFileList is robust
     function renderFileList(files: ChangedFile[]) {
-        if (!filesChangedListDiv || !filesChangedCountSpan) {
-             console.error("Files list container or count span not found in DOM.");
-             return; // Exit if elements aren't found
-        }
-
-        // --- Add log to confirm function runs and data received ---
-         console.log(`Rendering ${files.length} files...`, files);
-        // --- End log ---
-
-        if (!filesChangedListDiv || !filesChangedCountSpan) {
-            console.error("Files list container or count span not found in DOM.");
-            return;
-       }
-
-        filesChangedListDiv.innerHTML = ''; // Clear previous list or loading message
+        if (!filesChangedListDiv || !filesChangedCountSpan) { /* ... error handling ... */ return; }
+        console.log(`Rendering ${files.length} files...`, files);
+    
+        filesChangedListDiv.innerHTML = '';
         filesChangedCountSpan.textContent = String(files.length);
-
+    
         if (files.length === 0) {
             filesChangedListDiv.innerHTML = '<p>No changes detected.</p>';
             return;
         }
-
+    
         const ul = document.createElement('ul');
+        ul.className = 'file-list-ul';
+    
         files.forEach(file => {
             const li = document.createElement('li');
-            const statusSpan = document.createElement('span');
+            const status = file.status || '?';
+            // --- Add status class to the list item ---
+            li.className = `file-list-item status-${status.toLowerCase()}`;
+            // --- End Add ---
+    
+            // Icon Span
+            const iconSpan = document.createElement('span');
+            const iconName = getCodiconNameForFile(file.path || '');
+            iconSpan.className = `codicon ${iconName} file-icon`;
+    
+            // File Path Span
             const pathSpan = document.createElement('span');
-
-            statusSpan.className = `file-status file-status-${file.status?.toLowerCase() ?? 'q'}`; // Handle potential undefined status
-            statusSpan.textContent = file.status || '?'; // Show '?' if status is undefined
-
-            pathSpan.textContent = file.path?.split(/[\\/]/).pop() || file.path || 'Unknown path'; // Handle potential undefined path
+            pathSpan.textContent = file.path?.split(/[\\/]/).pop() || file.path || 'Unknown path';
             pathSpan.title = file.path || '';
-            pathSpan.className = 'file-path';
-
-            li.appendChild(statusSpan);
+            pathSpan.className = 'file-path'; // Keep this class
+    
+            // Status Span
+            const statusSpan = document.createElement('span');
+            statusSpan.className = `file-status file-status-${status.toLowerCase()}`;
+            statusSpan.textContent = status;
+    
+            li.appendChild(iconSpan);
             li.appendChild(pathSpan);
+            li.appendChild(statusSpan);
             ul.appendChild(li);
         });
         filesChangedListDiv.appendChild(ul);
     }
+
+    
 
 
     // --- Initialization ---
