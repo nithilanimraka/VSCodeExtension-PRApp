@@ -61,7 +61,7 @@ interface ActivePrWebview {
 }
 const activePrDetailPanels = new Map<number, ActivePrWebview>(); // Keyed by PR number
 let pollingIntervalId: NodeJS.Timeout | undefined = undefined;
-const POLLING_INTERVAL_MS = 45000; // Poll every 45 seconds
+const POLLING_INTERVAL_MS = 30000; // Poll every 30 seconds
 
 
 // =================================

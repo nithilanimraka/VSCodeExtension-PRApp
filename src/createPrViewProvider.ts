@@ -3,6 +3,7 @@ import * as vscode from 'vscode';
 import { getNonce } from './utils'; // Assuming getNonce is accessible (e.g., in utils.ts)
 import { getOctokit } from './auth';
 import type { Endpoints } from "@octokit/types"; // Import types for file data if needed
+import type { PullRequestInfo } from './prDataProvider';
 
 // Define types for Git info we might need
 interface GitInfo {
@@ -151,9 +152,30 @@ export class CreatePrViewProvider implements vscode.WebviewViewProvider {
                                 });
                                 if (response.status === 201) {
                                     vscode.window.showInformationMessage(`Pull Request #${response.data.number} created successfully!`);
-                                    // TODO: Maybe close this view or clear the form?
-                                    // Optionally refresh the *other* PR list view
+                            
+                                    // 1. Construct the PullRequestInfo object from the response
+                                    const prInfo: PullRequestInfo = {
+                                        id: response.data.id, // Added id field
+                                        number: response.data.number,
+                                        title: response.data.title,
+                                        url: response.data.html_url,
+                                        author: response.data.user?.login || 'unknown',
+                                        repoOwner: owner, // Use owner determined earlier
+                                        repoName: repo, // Use repo determined earlier
+                                        // Add other fields from response.data if needed by your detail view
+                                    };
+
+                                    // 2. Execute the command to open the detail view
+                                    vscode.commands.executeCommand('yourExtension.viewPullRequest', prInfo);
+                                    // --- END ADD ---
+
+
+                                    // 3. Refresh the main PR list view
                                     vscode.commands.executeCommand('yourExtension.refreshPrView');
+
+                                     // 4. Reset the Create PR form by sending fresh initial data
+                                    await this.prepareAndSendData();
+
                                 } else {
                                     vscode.window.showErrorMessage(`Failed to create PR (Status: ${response.status})`);
                                 }
@@ -341,6 +363,14 @@ export class CreatePrViewProvider implements vscode.WebviewViewProvider {
             }
         }
 
+        if (!owner || !repoName) {
+            console.warn("Could not determine GitHub owner/repo from origin remote URL:", remoteUrl);
+            vscode.window.showWarningMessage("Could not determine GitHub repository from 'origin' remote. Please ensure it's configured correctly.");
+            // Return empty branches but still try to get local changes
+            const localChanges = await this.getChangedFilesFromGit(repo);
+            return { headBranch, baseBranch, owner, repo: repoName, remoteUrl, changedFiles: localChanges, branches: [] }; // Return empty branches list
+        }
+
         // --- Fetch branches and changed files ---
         let branches: string[] = [];
         if (owner && repoName) {
@@ -379,9 +409,14 @@ export class CreatePrViewProvider implements vscode.WebviewViewProvider {
         const uniqueChanges = new Map<string, ChangedFile>();
     
         allChanges.forEach(change => {
-            let statusChar: ChangedFile['status'] = '?'; // Default to unknown
-    
-            // --- Rely primarily on the tooltip provided by the Git extension ---
+
+            if (!change.resourceUri) {
+                console.warn("Skipping change object without resourceUri:", change);
+                return; // Skip this iteration
+            }
+
+            const filePath = change.resourceUri.fsPath; // Now safe to access
+            let statusChar: ChangedFile['status'] = '?';
             const tooltip = change.decorations?.tooltip;
     
             if (typeof tooltip === 'string') {
@@ -407,7 +442,7 @@ export class CreatePrViewProvider implements vscode.WebviewViewProvider {
             // --- End status determination based on decorations ---
     
             // Use change.resourceUri.fsPath for the unique key and path
-            uniqueChanges.set(change.resourceUri.fsPath, { path: change.resourceUri.fsPath, status: statusChar });
+            uniqueChanges.set(change.resourceUri.fsPath, { path: filePath, status: statusChar });
         });
     
         return Array.from(uniqueChanges.values());
