@@ -37,6 +37,8 @@ interface PrDetails {
     authorAvatarUrl?: string | null;
     baseLabel: string;
     headLabel: string;
+    body: string | null; // body
+    createdAt: string; // creation date
 }
 
 // Type for the specific merge status update
@@ -72,6 +74,8 @@ type FromWebviewMessage =
 
     const mergeMethodSelect = document.getElementById('merge-method-select') as HTMLSelectElement | null;
     const confirmMergeButton = document.getElementById('confirm-merge-button') as HTMLButtonElement | null; 
+
+    const descriptionAreaDiv = document.getElementById('pr-description-area');
 
     const commentTextArea = document.getElementById('new-comment-text') as HTMLTextAreaElement | null;
     const addCommentButton = document.getElementById('add-comment-button') as HTMLButtonElement | null;
@@ -177,6 +181,43 @@ type FromWebviewMessage =
             //     ? `<span class="codicon codicon-git-merge"></span> Confirm Merge`
             //     : `<span class="codicon codicon-git-merge"></span> Cannot Merge`;
         }
+    }
+
+    // --- Render Function for PR Description ---
+    function renderPrDescription(prData: PrDetails) {
+        if (!descriptionAreaDiv) return;
+
+        const createdAtDate = new Date(prData.createdAt);
+        const formattedDate = createdAtDate.toLocaleString(); // Format date nicely
+
+        const authorAvatarHtml = prData.authorAvatarUrl
+            ? `<img class="avatar author-avatar" src="${escapeHtml(prData.authorAvatarUrl)}" alt="${escapeHtml(prData.authorLogin)}" width="20" height="20">`
+            : '<span class="avatar-placeholder" style="width:20px; height:20px;"></span>';
+
+        const headerHtml = `
+            <div class="comment-header"> ${/* Reuse comment header style? */''}
+                ${authorAvatarHtml}
+                <strong class="author">${escapeHtml(prData.authorLogin)}</strong> commented on ${formattedDate}
+            </div>
+        `;
+
+        let bodyHtml = '';
+        if (prData.body && prData.body.trim() !== '') {
+            try {
+                 // Use markdown-it to render the body
+                 bodyHtml = `<div class="pr-body-content markdown-body">${md.render(prData.body)}</div>`;
+            } catch (e) {
+                 console.error("Markdown rendering failed for PR body:", e);
+                  // Fallback to preformatted text on error
+                 bodyHtml = `<div class="pr-body-content"><pre>${escapeHtml(prData.body)}</pre></div>`;
+            }
+        } else {
+            bodyHtml = `<p class="no-description"><em>No description provided.</em></p>`;
+        }
+
+        // Combine header and body
+        descriptionAreaDiv.innerHTML = headerHtml + bodyHtml;
+        descriptionAreaDiv.classList.remove('loading'); // Remove loading state if applicable
     }
 
     function escapeHtml(unsafe: any): string {
@@ -535,6 +576,7 @@ type FromWebviewMessage =
                     renderTimeline(message.data.timeline || []);
                     renderMetadataHeader(message.data);
                     renderMergeStatus(message.data.mergeable, message.data.mergeable_state);
+                    renderPrDescription(message.data);
                     // TODO: Enable/disable merge button based on mergeable/state
                 break;
 

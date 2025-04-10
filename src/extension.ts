@@ -42,8 +42,10 @@ interface PrDetails {
     merged: boolean;
     authorLogin: string;
     authorAvatarUrl?: string | null; // Optional avatar
-    baseLabel: string; // e.g., owner:branch
-    headLabel: string; // e.g., owner:branch
+    baseLabel: string; 
+    headLabel: string; 
+    body: string | null;
+    createdAt: string; // ISO 8601 string date
 }
 
 // --- Timeline Item Structure ---
@@ -185,15 +187,18 @@ async function createOrShowPrDetailWebview(context: vscode.ExtensionContext, prI
     const existingActiveWebview = activePrDetailPanels.get(panelId);
     if (existingActiveWebview) {
         existingActiveWebview.panel.reveal(column);
+        existingActiveWebview.panel.title = `Pull Request #${prInfo.number}`;
         // Optional: Trigger a refresh even if revealing existing
         // await updateWebviewContent(context, existingActiveWebview.panel.webview, prInfo);
         return;
     }
 
+    const desiredPanelTitle = `Pull Request #${prInfo.number}`;    
+
     // Create a new panel.
     const panel = vscode.window.createWebviewPanel(
         'prDetailView', // View type
-        `PR #${prInfo.number}`, // Panel title
+        desiredPanelTitle, // Title of the panel
         column || vscode.ViewColumn.One,
         {
             enableScripts: true, // Keep scripts enabled
@@ -206,7 +211,7 @@ async function createOrShowPrDetailWebview(context: vscode.ExtensionContext, prI
              retainContextWhenHidden: true
         }
     );
-    panel.title = `PR #${prInfo.number}: ${prInfo.title}`; // Set full title
+    panel.title = desiredPanelTitle;
     const webview = panel.webview; // Get webview reference
 
     const activeWebview: ActivePrWebview = { panel, prInfo, lastCommentCheckTime: new Date() };
@@ -447,6 +452,8 @@ async function fetchPrFullDetails(octokit: Octokit, prInfo: PullRequestInfo): Pr
             authorAvatarUrl: pullData.user?.avatar_url,
             baseLabel: pullData.base?.label || 'unknown',
             headLabel: pullData.head?.label || 'unknown',
+            body: pullData.body, // body
+            createdAt: pullData.created_at, // creation date
         };
 
     } catch (error) {
@@ -657,6 +664,13 @@ async function getWebviewTimelineHtml(
                  </button>
             </div>
 
+        </div>
+
+        <hr class="status-timeline-separator">
+
+        <div id="pr-description-area" class="pr-description-area">
+             {/* Content will be added by JS */}
+             Loading description...
         </div>
 
         <hr class="status-timeline-separator">

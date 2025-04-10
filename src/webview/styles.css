@@ -374,3 +374,59 @@ code { font-family: var(--vscode-editor-font-family); font-size: calc(var(--vsco
     padding: 0.1em 0.4em;
     white-space: nowrap; /* Prevent wrapping within the label */
 }
+
+/* --- PR Description Area Styles --- */
+.pr-description-area {
+    padding: 15px; /* Add some padding */
+    margin-bottom: 20px; /* Space before timeline */
+    border: 1px solid var(--vscode-editorWidget-border, #444); /* Add border like comments */
+    border-radius: 4px;
+    background-color: var(--vscode-editorWidget-background); /* Optional background */
+}
+.pr-description-area.loading { /* Optional loading style */
+     color: var(--vscode-descriptionForeground);
+     font-style: italic;
+}
+
+
+/* Use comment header style or define new one */
+.pr-description-area .comment-header {
+    margin-bottom: 10px; /* Space between header and body */
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.9em;
+    color: var(--vscode-descriptionForeground);
+}
+.pr-description-area .comment-header .author {
+     font-weight: bold;
+     color: var(--vscode-editor-foreground);
+}
+.pr-description-area .comment-header .avatar { /* Ensure avatar style is applied */
+     border-radius: 50%;
+     vertical-align: middle;
+}
+
+
+/* Style the main body content */
+.pr-body-content {
+    line-height: 1.5; /* Improve readability */
+    /* Add specific markdown styles if needed, or rely on generic .markdown-body */
+}
+/* Ensure markdown styles defined earlier apply */
+.markdown-body p { margin-top: 0; margin-bottom: 1em; }
+.markdown-body ul, .markdown-body ol { margin: 0.5em 0 1em 2em; }
+.markdown-body li { margin-bottom: 0.3em; }
+.markdown-body pre { /* Styles defined earlier */ }
+.markdown-body code { /* Styles defined earlier */ }
+.markdown-body blockquote { /* Styles defined earlier */ }
+/* Add more styles as needed */
+
+
+/* Style for 'No description' text */
+.no-description {
+    color: var(--vscode-descriptionForeground);
+    font-style: italic;
+    margin: 0; /* Remove default paragraph margin */
+    padding: 5px 0; /* Add some padding */
+}
