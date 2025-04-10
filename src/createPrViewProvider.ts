@@ -84,6 +84,7 @@ export class CreatePrViewProvider implements vscode.WebviewViewProvider {
     private _view?: vscode.WebviewView;
     private _extensionContext: vscode.ExtensionContext;
     private _currentGitInfo: GitInfo = {}; // Store last known git info
+    private _visibilityChangeListener?: vscode.Disposable;
 
     constructor(context: vscode.ExtensionContext) {
         this._extensionContext = context;
@@ -94,7 +95,11 @@ export class CreatePrViewProvider implements vscode.WebviewViewProvider {
         context: vscode.WebviewViewResolveContext,
         _token: vscode.CancellationToken,
     ) {
+        console.log("CreatePrViewProvider: Resolving webview view."); 
         this._view = webviewView;
+
+        // Dispose of the old listener if resolveWebviewView is called again for the same provider instance
+        this._visibilityChangeListener?.dispose();
 
         webviewView.webview.options = {
             enableScripts: true,
@@ -107,27 +112,51 @@ export class CreatePrViewProvider implements vscode.WebviewViewProvider {
         // Set initial HTML (can be loading state or the form shell)
         webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
 
+        // --- ADD VISIBILITY CHANGE LISTENER ---
+        this._visibilityChangeListener = webviewView.onDidChangeVisibility(() => {
+            // Check if the view associated with THIS provider instance is now visible
+            if (this._view?.visible) {
+                console.log('Create PR View became visible. Refreshing data...');
+                // Re-fetch and send data when the view becomes visible
+                // This ensures the form is populated even after collapse/expand
+                this.prepareAndSendData(); // Use prepareAndSendData to fetch potentially fresh data
+            } else {
+                 console.log('Create PR View became hidden.'); // Log when hidden
+            }
+        });
+
+        // --- Clean up listener when the view itself is disposed ---
+        // This is good practice, especially if the view can be closed/removed.
+         const disposeListener = webviewView.onDidDispose(() => {
+              console.log("Create PR View disposed, cleaning up visibility listener.");
+              this._visibilityChangeListener?.dispose();
+              this._visibilityChangeListener = undefined; // Clear reference
+              this._view = undefined; // Clear view reference
+              disposeListener.dispose(); // Dispose this listener itself
+         });
+         // If the provider itself might be disposed, ensure listeners are cleaned up there too.
+
         // Handle messages from the webview
         webviewView.webview.onDidReceiveMessage(async (data: FromCreatePrWebviewMessage) => {
             switch (data.command) {
-                case 'webviewReady':
+                case 'webviewReady': {
                     // Webview is ready, if we have initial data, send it
                     console.log('Create PR webview is ready.');
-                    // if (this._currentGitInfo.headBranch) { // Check if we have data to send
-                    //     this.sendDataToWebview(this._currentGitInfo);
-                    // } else {
-                    //      // Maybe trigger a fetch if opened directly?
-                    //      await this.prepareAndSendData();
-                    // }
+                    // Optional: If initial load sometimes fails, you *could* trigger
+                     // prepareAndSendData here, but it might be redundant with the
+                     // command and visibility triggers. Let's leave it out for now.
+                     // await this.prepareAndSendData();
                     break;
-                case 'getChangedFiles':
+                }
+                case 'getChangedFiles': {
                     // Webview requested updated file list
                     const files = await this.getChangedFilesFromGit();
                      if (this._view && files) {
                          this._view.webview.postMessage({ command: 'loadFormData', data: { changedFiles: files } });
                      }
                     break;
-                case 'createPrRequest':
+                    }
+                case 'createPrRequest': {
                     // --- Execute the actual PR creation ---
                     const octokit = await getOctokit();
                     const owner = this._currentGitInfo.owner;
@@ -187,7 +216,8 @@ export class CreatePrViewProvider implements vscode.WebviewViewProvider {
                         vscode.window.showErrorMessage(`Failed to create Pull Request: ${err.message || err}`);
                     }
                     break;
-                case 'cancelPr':
+                }
+                case 'cancelPr': {
                     console.log("Provider received cancelPr request.");
                     // Clear stored info so the form doesn't repopulate automatically if reopened
                     this._currentGitInfo = {};
@@ -204,59 +234,126 @@ export class CreatePrViewProvider implements vscode.WebviewViewProvider {
                     // 2. Set the context variable back to false to hide this view
                     await vscode.commands.executeCommand('setContext', 'yourExtension:createPrViewVisible', false);
                     break;
+                }
 
-                case 'compareBranches':
-                    if (this._currentGitInfo.owner && this._currentGitInfo.repo && data.base && data.head) {
-                            console.log(`Provider received compare request: ${data.base}...${data.head}`);
+                case 'compareBranches': {
+                    // --- Get owner, repo, AND branches from stored info ---
+                    const owner = this._currentGitInfo.owner;
+                    const repo = this._currentGitInfo.repo;
+                    const branches = this._currentGitInfo.branches; // Get the stored list
+
+                    // Check we have all necessary info, including the branches list
+                    if (owner && repo && data.base && data.head && branches) {
+                        console.log(`Provider received compare request: ${data.base}...${data.head}`);
                         const comparisonFiles = await this.getComparisonFiles(
-                            this._currentGitInfo.owner,
-                            this._currentGitInfo.repo,
-                            data.base,
-                            data.head
+                            owner,
+                            repo,
+                            data.base, // Use the new base from message data
+                            data.head  // Use the new head from message data
                         );
-                            console.log("Comparison result:", comparisonFiles);
-                        // Send *only* the updated file list back
-                            this.sendDataToWebview({ changedFiles: comparisonFiles });
+                        console.log("Comparison result files:", comparisonFiles.length);
+
+                        // --- FIX: Send files, branches, and current selections back ---
+                        this.sendDataToWebview({
+                            changedFiles: comparisonFiles,
+                            branches: branches, // <<< Include the existing branch list
+                            baseBranch: data.base, // <<< Include current base selection
+                            headBranch: data.head  // <<< Include current head selection
+                            // Include owner/repo too if webview might need them? Unlikely here.
+                        });
+                        // --- END FIX ---
+
                     } else {
-                            console.warn("Missing owner/repo/base/head for branch comparison.");
-                            // Optionally send back an empty list or error state
-                            this.sendDataToWebview({ changedFiles: [] });
+                        // Log details if something is missing
+                        console.warn("Missing data for branch comparison.", {
+                             owner: !!owner,
+                             repo: !!repo,
+                             base: data.base,
+                             head: data.head,
+                             branchesAvailable: !!branches
+                         });
+                        // Send back empty files, but still include branches to prevent clearing
+                         this.sendDataToWebview({
+                             changedFiles: [],
+                             branches: this._currentGitInfo.branches || [], // Send stored branches or empty
+                             baseBranch: data.base, // Still send selections
+                             headBranch: data.head
+                         });
                     }
                     break;
+                }
 
-                case 'showError':
+                case 'showError':{
                     if (data.text) {
                         vscode.window.showErrorMessage(data.text); // Show the error using VS Code UI
                     }
                     break;
+                }
             }
         });
     }
 
     // Method called by the command in extension.ts to trigger loading data
     public async prepareAndSendData() {
+        console.log("CreatePrViewProvider: prepareAndSendData called."); // Log entry
         if (!this._view) {
+            console.log("prepareAndSendData: View not available yet, attempting focus...");
             // Try to focus the view to trigger resolveWebviewView if not already resolved
-            vscode.commands.executeCommand('yourCreatePrViewId.focus');
-             // It might take a moment for the view to resolve, maybe add a small delay or retry?
-             await new Promise(resolve => setTimeout(resolve, 100)); // Small delay
+            // Note: Focusing might not work if the view container isn't visible.
+             try {
+                 await vscode.commands.executeCommand(`${CreatePrViewProvider.viewType}.focus`);
+             } catch (e) {
+                  console.warn("Focus command failed (maybe view container not visible):", e);
+             }
+             // It might take a moment for the view to resolve after focus
+             await new Promise(resolve => setTimeout(resolve, 150)); // Slightly longer delay?
              if (!this._view) {
-                  console.error("Create PR View not available to send data.");
-                  vscode.window.showWarningMessage("Could not open Create PR form. Please click the activity bar icon.");
+                  console.error("Create PR View still not available after focus attempt.");
+                  // Optionally show a message if critical, but often the view appears later
+                  // vscode.window.showWarningMessage("Could not prepare Create PR form immediately.");
                   return;
              }
+             console.log("prepareAndSendData: View became available after focus/delay.");
+        } else {
+             console.log("prepareAndSendData: View already available.");
         }
 
-         this._currentGitInfo = await this.getCurrentGitInfo(); // Get latest info
-         this.sendDataToWebview(this._currentGitInfo);
+        // Ensure view is visible before proceeding (might be redundant with visibility check, but safe)
+        if (!this._view.visible) {
+            console.log("prepareAndSendData: View is not visible, skipping data send.");
+            // We don't want to fetch/send data if the user just hid the view.
+            // The onDidChangeVisibility listener will trigger this again when it becomes visible.
+            return;
+        }
 
+        console.log("prepareAndSendData: Fetching current git info...");
+         try {
+            this._currentGitInfo = await this.getCurrentGitInfo(); // Get latest info
+            console.log("prepareAndSendData: Git info fetched, sending to webview.");
+            this.sendDataToWebview(this._currentGitInfo);
+         } catch (error) {
+              console.error("prepareAndSendData: Error fetching git info:", error);
+              // Optionally send an error state to the webview
+              // this.sendDataToWebview({ command: 'showError', text: 'Failed to load repository data.' });
+              // Or just send empty data to clear the form
+              this.sendDataToWebview({}); // Send empty object
+         }
     }
 
      // Helper to send data (avoids repeating the check)
-    private sendDataToWebview(gitInfo: GitInfo) {
-         if (this._view) {
-             this._view.webview.postMessage({ command: 'loadFormData', data: gitInfo });
-         }
+    private sendDataToWebview(gitInfo: GitInfo | Record<string, never>) { // Allow empty object
+        if (this._view) {
+            // Ensure we're sending to a visible webview if possible
+            // (Might avoid errors if the view is disposed between check and send)
+            if(this._view.visible) {
+                console.log("Sending data to visible webview:", gitInfo);
+               this._view.webview.postMessage({ command: 'loadFormData', data: gitInfo });
+            } else {
+                 console.log("Webview is not visible, skipping postMessage.");
+            }
+        } else {
+            console.warn("Attempted to send data, but webview is not available.");
+        }
     }
 
     // --- Method to compare branches ---

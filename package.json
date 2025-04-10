@@ -15,7 +15,6 @@
   "activationEvents": [
     "onView:yourPrViewId",
     "onCommand:yourExtension.showCreatePullRequestView",
-    "onCommand:yourExtension.createPullRequest",
     "onCommand:yourExtension.refreshPrView",
     "onCommand:yourExtension.viewPullRequest",
     "onCommand:yourExtension.viewItemDiff",
@@ -33,11 +32,6 @@
       ]
     },
     "commands": [
-      {
-        "command": "yourExtension.createPullRequest",
-        "title": "Create GitHub Pull Request",
-        "category": "Your PR Extension"
-      },
       {
         "command": "yourExtension.showCreatePullRequestView",
         "title": "Create Pull Request",
@@ -61,11 +55,6 @@
       {
         "command": "yourExtension.viewDiff",
         "title": "View Pull Request Diff"
-      },
-      {
-        "command": "yourExtension.showCreatePullRequestView", 
-        "title": "Show Create Pull Request View",
-        "category": "Your PR Extension"
       }
     ],
     "menus": {

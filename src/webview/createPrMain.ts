@@ -57,21 +57,7 @@ declare const acquireVsCodeApi: () => VsCodeApi;
         if (message.command === 'loadFormData') {
             
             console.log('Webview received form data:', message.data);
-
-            // Check if data is meaningful, otherwise show waiting state
-            if (!message.data || (!message.data.branches && !message.data.changedFiles && !message.data.baseBranch && !message.data.headBranch)) {
-                console.log("Received empty data, showing waiting state.");
-                showWaitingState(true); // Show waiting message
-                // Clear specific fields just in case
-                if(titleInput) titleInput.value = '';
-                if(descriptionTextarea) descriptionTextarea.value = '';
-                populateBranchDropdown(baseBranchSelect, []);
-                populateBranchDropdown(headBranchSelect, []);
-                renderFileList([]);
-                return; // Stop processing further
-           }
-
-           // Data received, ensure form is visible
+            // --- ALWAYS Ensure form is visible when data arrives ---
            showWaitingState(false);
 
            // Clear Title and Description before applying new data (handles reset case too)
@@ -79,52 +65,83 @@ declare const acquireVsCodeApi: () => VsCodeApi;
            if (descriptionTextarea) descriptionTextarea.value = '';
 
             // ONLY populate branches if the message actually contains them
-            if (message.data.branches !== undefined) {
+            if (message.data?.branches !== undefined) { // Add null check for message.data
                 availableBranches = message.data.branches; // Store the branches
                 console.log("Populating branch dropdowns.");
                 populateBranchDropdown(baseBranchSelect, availableBranches, message.data.baseBranch);
                 populateBranchDropdown(headBranchSelect, availableBranches, message.data.headBranch);
+            } else if (message.data) { // Only clear if message.data exists but branches doesn't
+                 // If branches array is missing, clear the dropdowns
+                 console.log("Branches data missing, clearing dropdowns.");
+                 populateBranchDropdown(baseBranchSelect, []);
+                 populateBranchDropdown(headBranchSelect, []);
             }
 
+
             // Set title if applicable (can happen on initial load)
-            if (message.data.branches !== undefined && !titleInput.value && message.data.headBranch) {
+             // Add null check for message.data
+            if (message.data?.branches !== undefined && titleInput && !titleInput.value && message.data.headBranch) {
                 titleInput.value = formatBranchNameAsTitle(message.data.headBranch);
             }
 
             // Update files list if present in the message
-            if(message.data.changedFiles !== undefined) {
+            if(message.data?.changedFiles !== undefined) { // Add null check for message.data
                 console.log("Updating file list.");
                 renderFileList(message.data.changedFiles || []);
-            } else if (message.data.branches !== undefined) {
-                 // If it was an initial load (branches present) but no files, clear/reset file list
-                 console.log("Initial load, resetting file list.");
-                 renderFileList([]); // Render empty state initially
+            // } else if (message.data?.branches !== undefined) { // Original condition, maybe too broad
+            } else if (message.data) { // If data exists but changedFiles doesn't
+                 // If changedFiles is missing, clear/reset file list
+                 console.log("Changed files data missing, resetting file list.");
+                 renderFileList([]); // Render empty state
+            } else {
+                 // If message.data itself is missing/null, render empty file list
+                 renderFileList([]);
             }
         }
     });
 
     function showWaitingState(show: boolean) {
         if (formElement) {
+            const waitingMsgId = 'waiting-message'; // Define ID
+            let waitingMsg = document.getElementById(waitingMsgId);
+
             if (show) {
-                 // Hide form elements, show a message
-                 formElement.style.display = 'none';
-                 // Create/show a waiting message element if it doesn't exist
-                 let waitingMsg = document.getElementById('waiting-message');
-                 if (!waitingMsg) {
-                      waitingMsg = document.createElement('p');
-                      waitingMsg.id = 'waiting-message';
-                      waitingMsg.textContent = "Open a GitHub repository and use the 'Create Pull Request' action from the PR list view.";
-                      waitingMsg.style.padding = '15px';
-                      waitingMsg.style.textAlign = 'center';
-                      document.body.insertBefore(waitingMsg, formElement);
-                 }
-                 waitingMsg.style.display = 'block';
+                // Hide form elements, show a message
+                formElement.style.display = 'none';
+                // Create/show a waiting message element if it doesn't exist
+                if (!waitingMsg) {
+                    waitingMsg = document.createElement('p');
+                    waitingMsg.id = waitingMsgId; // Use defined ID
+                    waitingMsg.textContent = "Open a GitHub repository and use the 'Create Pull Request' action from the PR list view.";
+                    waitingMsg.style.padding = '15px';
+                    waitingMsg.style.textAlign = 'center';
+                    // Insert before form OR append to body if form isn't found initially
+                    document.body.insertBefore(waitingMsg, formElement.nextSibling); // Insert after form if possible
+                }
+                waitingMsg.style.display = 'block'; // Ensure it's visible
             } else {
-                 // Show form elements, hide waiting message
-                 formElement.style.display = 'flex'; 
-                 const waitingMsg = document.getElementById('waiting-message');
-                 if (waitingMsg) waitingMsg.style.display = 'none';
+                // Show form elements, hide waiting message
+                formElement.style.display = 'flex'; // Use 'flex' as per your CSS
+                if (waitingMsg) {
+                    waitingMsg.style.display = 'none'; // Hide the waiting message
+                }
             }
+        } else {
+            // Handle case where form element isn't found initially
+            console.warn("'.create-pr-form' element not found during showWaitingState call.");
+            // You might want to ensure the waiting message is still handled correctly
+            const waitingMsgId = 'waiting-message';
+            let waitingMsg = document.getElementById(waitingMsgId);
+             if (show && !waitingMsg) {
+                waitingMsg = document.createElement('p');
+                waitingMsg.id = waitingMsgId;
+                waitingMsg.textContent = "Loading Create Pull Request form..."; // More appropriate initial message?
+                waitingMsg.style.padding = '15px';
+                waitingMsg.style.textAlign = 'center';
+                document.body.appendChild(waitingMsg); // Append to body as fallback
+             } else if (waitingMsg) {
+                 waitingMsg.style.display = show ? 'block' : 'none';
+             }
         }
     }
 
@@ -165,7 +182,6 @@ declare const acquireVsCodeApi: () => VsCodeApi;
         // --- Get values from select elements ---
         const base = baseBranchSelect.value;
         const head = headBranchSelect.value;
-        // --- End Get values ---
         const title = titleInput.value;
         const body = descriptionTextarea.value;
 
@@ -175,6 +191,12 @@ declare const acquireVsCodeApi: () => VsCodeApi;
              vscode.postMessage({ command: 'showError', text: 'Please select base/head branches and enter a title.' }); // Example: Tell extension to show error
             return;
         }
+
+        if (base === head) {
+            console.error("Base and head branches are the same.");
+            vscode.postMessage({ command: 'showError', text: 'Base and Merge branches cannot be the same.' });
+           return;
+       }
 
         vscode.postMessage({
             command: 'createPrRequest',
@@ -308,8 +330,13 @@ declare const acquireVsCodeApi: () => VsCodeApi;
         filesChangedListDiv.appendChild(ul);
     }
 
-    // Initial state on load might be waiting
-    showWaitingState(true); // Show waiting message initially
+    // Initial state on load - Keep showing waiting initially is fine
+    // Or maybe hide both initially until first message?
+    // showWaitingState(true); // Show waiting message initially
+    if(formElement) formElement.style.display = 'none'; // Hide form initially
+    const waitingMsg = document.getElementById('waiting-message');
+    if(waitingMsg) waitingMsg.style.display = 'block'; // Show waiting message
+
 
     // --- Initialization ---
     console.log("Create PR webview script initialized.");

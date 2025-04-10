@@ -137,17 +137,6 @@ export function activate(context: vscode.ExtensionContext) {
         }, 100); // Short delay
    }));
 
-    // Create Pull Request Command (Focuses the Create PR View & loads data)
-    // Make sure this is the ONLY registration block for this command ID
-    context.subscriptions.push(vscode.commands.registerCommand('yourExtension.createPullRequest', async () => {
-        // 1. Focus the separate "Create PR" view. VS Code activates its provider if needed.
-        await vscode.commands.executeCommand('yourCreatePrViewId.focus');
-
-        // 2. Tell the CreatePrViewProvider instance to fetch initial Git data
-        //    and send it to its webview to populate the form.
-        await createPrViewProvider.prepareAndSendData();
-    }));
-
     // Command for clicking a PR item in the Tree View (yourPrViewId)
     // Update the command registration for viewPullRequest
     context.subscriptions.push(vscode.commands.registerCommand(
