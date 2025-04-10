@@ -28,24 +28,22 @@ type FromWebviewMessage =
     | { command: 'addComment'; text: string }
     | { command: 'closePr' };
 
-interface CheckRun {
-    name: string;
-    status: CheckStatus;
-    conclusion: CheckConclusion;
-    html_url: string | null;
-}
-
-interface StatusContext {
-    context: string;
-    state: "error" | "failure" | "pending" | "success";
-    target_url: string | null;
-    description: string | null;
-}
+type MergeStatusUpdateData = {
+    mergeable: boolean | null;
+    mergeable_state: string;
+};
 
 interface PrDetails {
     timeline: TimelineItem[];
     mergeable_state: string; // e.g., 'clean', 'dirty', 'blocked', 'unstable'
     mergeable: boolean | null;
+    // Fields for the header display
+    state: 'open' | 'closed';
+    merged: boolean;
+    authorLogin: string;
+    authorAvatarUrl?: string | null; // Optional avatar
+    baseLabel: string; // e.g., owner:branch
+    headLabel: string; // e.g., owner:branch
 }
 
 // --- Timeline Item Structure ---
@@ -136,12 +134,16 @@ export function activate(context: vscode.ExtensionContext) {
     }));
 
     // Command for clicking a PR item in the Tree View (yourPrViewId)
-    context.subscriptions.push(vscode.commands.registerCommand('yourExtension.viewPullRequest', (itemOrPrInfo: PullRequestItem | PullRequestInfo) => {
-        // Determine the PR info (handle TreeItem or direct info)
-        const prInfo = (itemOrPrInfo instanceof PullRequestItem) ? itemOrPrInfo.prInfo : itemOrPrInfo;
-        // Assuming createOrShowPrDetailWebview is defined elsewhere in this file or imported
-        createOrShowPrDetailWebview(context, prInfo);
-    }));
+    // Update the command registration for viewPullRequest
+    context.subscriptions.push(vscode.commands.registerCommand(
+        'yourExtension.viewPullRequest',
+        // Add the optional boolean flag parameter
+        (itemOrPrInfo: PullRequestItem | PullRequestInfo, isNewlyCreated?: boolean) => {
+            const prInfo = (itemOrPrInfo instanceof PullRequestItem) ? itemOrPrInfo.prInfo : itemOrPrInfo;
+            // Pass the flag along to the function that opens the webview
+            createOrShowPrDetailWebview(context, prInfo, isNewlyCreated);
+        }
+    ));
 
 
     // NEW Command for the sidebar diff button
@@ -176,7 +178,7 @@ export function activate(context: vscode.ExtensionContext) {
 // =================================
 // WEBVIEW PANEL MANAGEMENT
 // =================================
-async function createOrShowPrDetailWebview(context: vscode.ExtensionContext, prInfo: PullRequestInfo) {
+async function createOrShowPrDetailWebview(context: vscode.ExtensionContext, prInfo: PullRequestInfo, isNewlyCreated?: boolean) {
     const column = vscode.window.activeTextEditor?.viewColumn;
     const panelId = prInfo.number;
 
@@ -205,6 +207,7 @@ async function createOrShowPrDetailWebview(context: vscode.ExtensionContext, prI
         }
     );
     panel.title = `PR #${prInfo.number}: ${prInfo.title}`; // Set full title
+    const webview = panel.webview; // Get webview reference
 
     const activeWebview: ActivePrWebview = { panel, prInfo, lastCommentCheckTime: new Date() };
     activePrDetailPanels.set(panelId, activeWebview);
@@ -305,17 +308,42 @@ async function createOrShowPrDetailWebview(context: vscode.ExtensionContext, prI
         context.subscriptions
     );
 
+    startPollingIfNotRunning();
+
+    // --- DELAYED REFRESH FOR NEW PRS ---
+    if (isNewlyCreated) {
+        const refreshDelayMs = 3000;
+        console.log(`PR #${prInfo.number} is newly created. Scheduling status refresh in ${refreshDelayMs}ms.`);
+
+        setTimeout(async () => {
+            const currentPanelInfo = activePrDetailPanels.get(prInfo.number);
+            // Check if panel still exists and belongs to this PR
+            if (currentPanelInfo && currentPanelInfo.panel === panel) {
+                const octokit = await getOctokit(); // Get octokit instance again
+                if (octokit) {
+                    console.log(`Refreshing MERGE STATUS for newly created PR #${prInfo.number}...`);
+                    // --- Call the NEW specific update function ---
+                    await fetchAndUpdateMergeStatus(octokit, prInfo, webview);
+                    // --- End Call ---
+                } else {
+                     console.warn("Cannot refresh merge status: Octokit not available.");
+                }
+            } else {
+                 console.log(`Panel for newly created PR #${prInfo.number} no longer active or changed before refresh could run.`);
+            }
+        }, refreshDelayMs);
+    }
+
     // Clean up when panel is closed
     panel.onDidDispose(
         () => {
+            console.log(`Panel for PR #${prInfo.number} disposed.`);
             activePrDetailPanels.delete(panelId);
             stopPollingIfNecessary();
         },
         null,
         context.subscriptions
     );
-
-    startPollingIfNotRunning();
 }
 
 // =================================
@@ -412,7 +440,13 @@ async function fetchPrFullDetails(octokit: Octokit, prInfo: PullRequestInfo): Pr
             timeline: timeline,
             mergeable_state: pullData.mergeable_state,
             mergeable: pullData.mergeable,
-            // head_sha: head_sha, // Remove if not needed elsewhere
+            // Populate new fields
+            state: pullData.state as ('open' | 'closed'), // Add type assertion
+            merged: pullData.merged || false, // Ensure boolean
+            authorLogin: pullData.user?.login || 'unknown',
+            authorAvatarUrl: pullData.user?.avatar_url,
+            baseLabel: pullData.base?.label || 'unknown',
+            headLabel: pullData.head?.label || 'unknown',
         };
 
     } catch (error) {
@@ -599,8 +633,12 @@ async function getWebviewTimelineHtml(
     </head>
     <body>
         <h1><a href="${prInfo.url}" target="_blank">#${prInfo.number}: ${escapeHtml(prInfo.title)}</a></h1>
-        <p>Author: ${escapeHtml(prInfo.author)}</p>
-        <hr>
+        
+        <div id="pr-metadata-header" class="pr-metadata-header">
+             Loading details...
+        </div>
+
+        <hr class="status-timeline-separator">
 
         <div id="pr-status-area" class="pr-status-area">
             <div id="merge-status" class="status-section loading">Loading merge status...</div>
@@ -712,6 +750,36 @@ async function pollForUpdates() {
 
     await Promise.all(updateChecks);
     console.log("Polling cycle finished.");
+}
+
+async function fetchAndUpdateMergeStatus(
+    octokit: Octokit, // Pass octokit instance
+    prInfo: PullRequestInfo,
+    webview: vscode.Webview // Pass the specific webview to update
+) {
+    console.log(`Workspaceing merge status update for PR #${prInfo.number}...`);
+    try {
+        const { data: pullData } = await octokit.pulls.get({
+            owner: prInfo.repoOwner,
+            repo: prInfo.repoName,
+            pull_number: prInfo.number,
+        });
+
+        // Send a specific message only containing merge data
+        webview.postMessage({
+            command: 'updateMergeStatus', // New command name
+            data: {
+                mergeable: pullData.mergeable,
+                mergeable_state: pullData.mergeable_state,
+            } as MergeStatusUpdateData // Add type assertion
+        });
+        console.log(`Sent merge status update for PR #${prInfo.number}: ${pullData.mergeable_state}`);
+
+    } catch (error) {
+        console.error(`Failed to fetch merge status update for PR #${prInfo.number}:`, error);
+        // Optionally inform the webview of the failure?
+        // webview.postMessage({ command: 'showError', message: 'Could not update merge status.' });
+    }
 }
 
 

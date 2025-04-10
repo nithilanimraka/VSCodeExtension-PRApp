@@ -27,14 +27,29 @@ interface CommitTimelineItem extends TimelineItemBase { type: 'commit'; data: Co
 type TimelineItem = ReviewTimelineItem | ReviewCommentTimelineItem | IssueCommentTimelineItem | CommitTimelineItem;
 
 interface PrDetails {
-    timeline: TimelineItem[]; // Assuming TimelineItem is already defined
+    timeline: TimelineItem[];
     mergeable_state: string;
     mergeable: boolean | null;
+    // Add fields for the header display
+    state: 'open' | 'closed';
+    merged: boolean;
+    authorLogin: string;
+    authorAvatarUrl?: string | null;
+    baseLabel: string;
+    headLabel: string;
 }
+
+// Type for the specific merge status update
+type MergeStatusUpdateData = {
+    mergeable: boolean | null;
+    mergeable_state: string;
+};
+
 // Message type from extension
 type FromExtensionMessage =
     | { command: 'loadDetails'; data: PrDetails }
     | { command: 'updateTimeline'; timeline: TimelineItem[] } // Keep if polling only sends timeline
+    | { command: 'updateMergeStatus'; data: MergeStatusUpdateData }
     | { command: 'showError'; message: string };
 
 // Messages sent FROM webview TO extension
@@ -52,6 +67,8 @@ type FromWebviewMessage =
     const timelineContainer = document.getElementById('timeline-area');
 
     const mergeStatusDiv = document.getElementById('merge-status');
+
+    const metadataHeaderDiv = document.getElementById('pr-metadata-header');
 
     const mergeMethodSelect = document.getElementById('merge-method-select') as HTMLSelectElement | null;
     const confirmMergeButton = document.getElementById('confirm-merge-button') as HTMLButtonElement | null; 
@@ -72,6 +89,51 @@ type FromWebviewMessage =
     // --- End Instantiate ---
 
     // --- Helper Functions ---
+
+    function renderMetadataHeader(prData: PrDetails) {
+        if (!metadataHeaderDiv) return;
+
+        let statusText = 'Unknown';
+        let statusClass = 'status-unknown';
+        let statusIcon = 'codicon-git-pull-request'; // Default icon
+
+        if (prData.state === 'closed') {
+            if (prData.merged) {
+                statusText = 'Merged';
+                statusClass = 'status-merged';
+                statusIcon = 'codicon-git-merge';
+            } else {
+                statusText = 'Closed';
+                statusClass = 'status-closed';
+                statusIcon = 'codicon-git-pull-request-closed';
+            }
+        } else if (prData.state === 'open') {
+            statusText = 'Open';
+            statusClass = 'status-open';
+            statusIcon = 'codicon-git-pull-request'; // Or Draft icon if available/needed
+        }
+
+        const authorAvatarHtml = prData.authorAvatarUrl
+            ? `<img class="avatar author-avatar" src="${escapeHtml(prData.authorAvatarUrl)}" alt="${escapeHtml(prData.authorLogin)}" width="20" height="20">`
+            : '<span class="avatar-placeholder" style="width:20px; height:20px;"></span>'; // Placeholder if no avatar
+
+        // Construct the description string
+        const descriptionHtml = `
+            ${authorAvatarHtml}
+            <span class="author-login">${escapeHtml(prData.authorLogin)}</span> wants to merge changes into
+            <code class="branch-label">${escapeHtml(prData.baseLabel)}</code> from
+            <code class="branch-label">${escapeHtml(prData.headLabel)}</code>
+        `;
+
+        metadataHeaderDiv.innerHTML = `
+            <span class="pr-status-badge ${statusClass}">
+                <span class="codicon ${statusIcon}"></span> ${statusText}
+            </span>
+            <span class="pr-description-text">
+                ${descriptionHtml}
+            </span>
+        `;
+    }
 
     function renderMergeStatus(mergeable: boolean | null, state: string) {
         if (!mergeStatusDiv) return;
@@ -470,9 +532,16 @@ type FromWebviewMessage =
             case 'loadDetails':
                  console.log('Received full PR details:', message.data);
                  if (timelineContainer) timelineContainer.innerHTML = ''; // Clear loading indicator
-                 renderTimeline(message.data.timeline || []);
-                 renderMergeStatus(message.data.mergeable, message.data.mergeable_state);
-                // TODO: Enable/disable merge button based on mergeable/state
+                    renderTimeline(message.data.timeline || []);
+                    renderMetadataHeader(message.data);
+                    renderMergeStatus(message.data.mergeable, message.data.mergeable_state);
+                    // TODO: Enable/disable merge button based on mergeable/state
+                break;
+
+            case 'updateMergeStatus':
+                console.log('Received merge status update:', message.data);
+                // Call only the function needed to update the merge section
+                renderMergeStatus(message.data.mergeable, message.data.mergeable_state);
                 break;
 
             case 'updateTimeline':

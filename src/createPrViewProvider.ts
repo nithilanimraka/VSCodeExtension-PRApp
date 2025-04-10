@@ -165,6 +165,8 @@ export class CreatePrViewProvider implements vscode.WebviewViewProvider {
                                         // Add other fields from response.data if needed by your detail view
                                     };
 
+                                    vscode.commands.executeCommand('yourExtension.viewPullRequest', prInfo, true); // Pass true for isNewlyCreated
+
                                     // 2. Execute the command to open the detail view
                                     vscode.commands.executeCommand('yourExtension.viewPullRequest', prInfo);
                                     // --- END ADD ---

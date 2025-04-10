@@ -303,3 +303,74 @@ code { font-family: var(--vscode-editor-font-family); font-size: calc(var(--vsco
     justify-content: flex-end; /* Align buttons right */
     gap: 10px;
 }
+
+/* --- Metadata Header Styles --- */
+.pr-metadata-header {
+    display: flex;
+    align-items: center;
+    gap: 10px; /* Space between badge and text */
+    margin-bottom: 8px; /* Space below header */
+    flex-wrap: wrap; /* Allow wrapping */
+    font-size: var(--vscode-font-size);
+}
+
+.pr-status-badge {
+    display: inline-flex; /* Align icon and text */
+    align-items: center;
+    gap: 5px;
+    padding: 4px 8px;
+    border-radius: 15px; /* Pill shape */
+    font-weight: bold;
+    font-size: 0.9em;
+    flex-shrink: 0; /* Don't shrink badge */
+}
+.pr-status-badge .codicon {
+    vertical-align: text-bottom; /* Align icon better */
+}
+
+/* Badge Colors (using common GH colors or theme vars) */
+.pr-status-badge.status-open {
+    background-color: rgba(45, 164, 78, 0.15); /* Green background */
+    color: var(--vscode-gitDecoration-addedResourceForeground, #2da44e); /* Green text */
+}
+.pr-status-badge.status-merged {
+    background-color: rgba(139, 80, 219, 0.15); /* Purple background */
+    color: var(--vscode-gitDecoration-renamedResourceForeground, #8B50DB); /* Purple text */
+}
+.pr-status-badge.status-closed {
+    background-color: rgba(207, 34, 46, 0.15); /* Red background */
+    color: var(--vscode-gitDecoration-deletedResourceForeground, #cf222e); /* Red text */
+}
+.pr-status-badge.status-unknown {
+    background-color: var(--vscode-editorWidget-background);
+    color: var(--vscode-descriptionForeground);
+    border: 1px solid var(--vscode-editorWidget-border);
+}
+
+
+.pr-description-text {
+    display: inline-flex; /* Align avatar and text */
+    align-items: center;
+    gap: 6px;
+    color: var(--vscode-descriptionForeground); /* Dimmer text */
+}
+
+.author-avatar {
+    border-radius: 50%;
+    vertical-align: middle;
+}
+
+.author-login {
+    font-weight: bold;
+    color: var(--vscode-editor-foreground); /* Slightly less dim */
+}
+
+.branch-label { /* Style for the owner:branch parts */
+    font-family: var(--vscode-editor-font-family); /* Monospace font */
+    font-size: calc(var(--vscode-editor-font-size) * 0.95); /* Slightly larger than default code */
+    background-color: var(--vscode-textBlockQuote-background);
+    border: 1px solid var(--vscode-button-secondaryBackground);
+    border-radius: 3px;
+    padding: 0.1em 0.4em;
+    white-space: nowrap; /* Prevent wrapping within the label */
+}
