@@ -1,4 +1,3 @@
-// src/createPrViewProvider.ts
 import * as vscode from 'vscode';
 import { getNonce } from './utils'; // Assuming getNonce is accessible (e.g., in utils.ts)
 import { getOctokit } from './auth';
@@ -114,12 +113,12 @@ export class CreatePrViewProvider implements vscode.WebviewViewProvider {
                 case 'webviewReady':
                     // Webview is ready, if we have initial data, send it
                     console.log('Create PR webview is ready.');
-                    if (this._currentGitInfo.headBranch) { // Check if we have data to send
-                        this.sendDataToWebview(this._currentGitInfo);
-                    } else {
-                         // Maybe trigger a fetch if opened directly?
-                         await this.prepareAndSendData();
-                    }
+                    // if (this._currentGitInfo.headBranch) { // Check if we have data to send
+                    //     this.sendDataToWebview(this._currentGitInfo);
+                    // } else {
+                    //      // Maybe trigger a fetch if opened directly?
+                    //      await this.prepareAndSendData();
+                    // }
                     break;
                 case 'getChangedFiles':
                     // Webview requested updated file list
@@ -189,10 +188,20 @@ export class CreatePrViewProvider implements vscode.WebviewViewProvider {
                     }
                     break;
                 case 'cancelPr':
-                    // TODO: Decide what cancel means (clear form, close view?)
-                    vscode.window.showInformationMessage("PR Creation Cancelled.");
-                    // Maybe clear the form by sending empty data?
-                     this.sendDataToWebview({ headBranch: undefined, baseBranch: undefined, changedFiles: [] });
+                    console.log("Provider received cancelPr request.");
+                    // Clear stored info so the form doesn't repopulate automatically if reopened
+                    this._currentGitInfo = {};
+                    // Send empty data to reset the webview form fields via loadFormData logic
+                    this.sendDataToWebview({
+                         // Send undefined/empty for fields handled by webview's loadFormData
+                         branches: [], // Causes "No branches found"
+                         changedFiles: [], // Causes "No changes detected"
+                         // Base/head will be undefined, title/desc cleared by webview
+                    });
+
+                    // --- Switch focus back to the main PR list view ---
+                    // Use the ID of your TreeView provider's view
+                    await vscode.commands.executeCommand('yourPrViewId.focus');
                     break;
 
                 case 'compareBranches':

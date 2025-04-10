@@ -44,6 +44,8 @@ declare const acquireVsCodeApi: () => VsCodeApi;
     const cancelButton = document.getElementById('cancel-button');
     const createButton = document.getElementById('create-button');
 
+    const formElement = document.querySelector('.create-pr-form') as HTMLElement | null; // Get form container
+
     // --- Store the branches list locally ---
     let availableBranches: string[] | undefined = undefined;
 
@@ -53,7 +55,28 @@ declare const acquireVsCodeApi: () => VsCodeApi;
     window.addEventListener('message', (event: MessageEvent<ToCreatePrWebviewMessage>) => {
         const message = event.data;
         if (message.command === 'loadFormData') {
+            
             console.log('Webview received form data:', message.data);
+
+            // Check if data is meaningful, otherwise show waiting state
+            if (!message.data || (!message.data.branches && !message.data.changedFiles && !message.data.baseBranch && !message.data.headBranch)) {
+                console.log("Received empty data, showing waiting state.");
+                showWaitingState(true); // Show waiting message
+                // Clear specific fields just in case
+                if(titleInput) titleInput.value = '';
+                if(descriptionTextarea) descriptionTextarea.value = '';
+                populateBranchDropdown(baseBranchSelect, []);
+                populateBranchDropdown(headBranchSelect, []);
+                renderFileList([]);
+                return; // Stop processing further
+           }
+
+           // Data received, ensure form is visible
+           showWaitingState(false);
+
+           // Clear Title and Description before applying new data (handles reset case too)
+           if (titleInput) titleInput.value = '';
+           if (descriptionTextarea) descriptionTextarea.value = '';
 
             // ONLY populate branches if the message actually contains them
             if (message.data.branches !== undefined) {
@@ -79,6 +102,31 @@ declare const acquireVsCodeApi: () => VsCodeApi;
             }
         }
     });
+
+    function showWaitingState(show: boolean) {
+        if (formElement) {
+            if (show) {
+                 // Hide form elements, show a message
+                 formElement.style.display = 'none';
+                 // Create/show a waiting message element if it doesn't exist
+                 let waitingMsg = document.getElementById('waiting-message');
+                 if (!waitingMsg) {
+                      waitingMsg = document.createElement('p');
+                      waitingMsg.id = 'waiting-message';
+                      waitingMsg.textContent = "Open a GitHub repository and use the 'Create Pull Request' action from the PR list view.";
+                      waitingMsg.style.padding = '15px';
+                      waitingMsg.style.textAlign = 'center';
+                      document.body.insertBefore(waitingMsg, formElement);
+                 }
+                 waitingMsg.style.display = 'block';
+            } else {
+                 // Show form elements, hide waiting message
+                 formElement.style.display = 'flex'; 
+                 const waitingMsg = document.getElementById('waiting-message');
+                 if (waitingMsg) waitingMsg.style.display = 'none';
+            }
+        }
+    }
 
     // --- Listener for branch changes ---
     let compareTimeout: number | undefined;
@@ -136,12 +184,11 @@ declare const acquireVsCodeApi: () => VsCodeApi;
 
     // Handle Cancel button click
     cancelButton?.addEventListener('click', () => {
+        console.log("Cancel button clicked");
+        // Tell extension host we cancelled
         vscode.postMessage({ command: 'cancelPr' });
-        // Optionally clear the form fields locally
-        // titleInput.value = '';
-        // descriptionTextarea.value = '';
-        // baseBranchInput.value = ''; // Keep these maybe?
-        // headBranchInput.value = '';
+        // Show waiting state immediately in UI for faster feedback
+        showWaitingState(true);
     });
 
     // --- NEW: Helper Function to get Codicon class based on filename ---
@@ -261,8 +308,8 @@ declare const acquireVsCodeApi: () => VsCodeApi;
         filesChangedListDiv.appendChild(ul);
     }
 
-    
-
+    // Initial state on load might be waiting
+    showWaitingState(true); // Show waiting message initially
 
     // --- Initialization ---
     console.log("Create PR webview script initialized.");
