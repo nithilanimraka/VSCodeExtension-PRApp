@@ -124,6 +124,19 @@ export function activate(context: vscode.ExtensionContext) {
         }
     }));
 
+    // Show Create Pull Request View (triggered by title button)
+    context.subscriptions.push(vscode.commands.registerCommand('yourExtension.showCreatePullRequestView', async () => {
+        // 1. Set the context variable to make the view potentially visible in the UI
+        await vscode.commands.executeCommand('setContext', 'yourExtension:createPrViewVisible', true);
+        // 2. Explicitly focus the view (this makes it the active one in the container)
+        await vscode.commands.executeCommand('yourCreatePrViewId.focus');
+        // 3. Tell the provider to load its data (ensure provider is resolved)
+        // Small delay might be needed after focus before provider is fully ready
+        setTimeout(() => {
+            createPrViewProvider.prepareAndSendData();
+        }, 100); // Short delay
+   }));
+
     // Create Pull Request Command (Focuses the Create PR View & loads data)
     // Make sure this is the ONLY registration block for this command ID
     context.subscriptions.push(vscode.commands.registerCommand('yourExtension.createPullRequest', async () => {
@@ -174,6 +187,9 @@ export function activate(context: vscode.ExtensionContext) {
             prDataProvider.refresh();
         }
     }));
+
+    // Start with the create view hidden
+    vscode.commands.executeCommand('setContext', 'yourExtension:createPrViewVisible', false);
 }
 
 

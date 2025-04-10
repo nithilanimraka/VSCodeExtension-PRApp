@@ -14,7 +14,7 @@
 	],
   "activationEvents": [
     "onView:yourPrViewId",
-    "onView:yourCreatePrViewId",
+    "onCommand:yourExtension.showCreatePullRequestView",
     "onCommand:yourExtension.createPullRequest",
     "onCommand:yourExtension.refreshPrView",
     "onCommand:yourExtension.viewPullRequest",
@@ -29,11 +29,6 @@
           "id": "your-pr-activitybar",
           "title": "Your PRs",
           "icon": "$(code-review)"
-        },
-        {
-          "id": "your-create-pr-activitybar", 
-          "title": "Create PR", 
-          "icon": "$(git-pull-request-create)"
         }
       ]
     },
@@ -42,6 +37,11 @@
         "command": "yourExtension.createPullRequest",
         "title": "Create GitHub Pull Request",
         "category": "Your PR Extension"
+      },
+      {
+        "command": "yourExtension.showCreatePullRequestView",
+        "title": "Create Pull Request",
+        "icon": "$(git-pull-request-create)"
       },
       {
         "command": "yourExtension.viewItemDiff",
@@ -74,6 +74,11 @@
           "command": "yourExtension.refreshPrView",
           "when": "view == yourPrViewId",
           "group": "navigation"
+        },
+        { 
+          "command": "yourExtension.showCreatePullRequestView",
+          "when": "view == yourPrViewId", 
+          "group": "navigation@1"
         }
       ],
       "view/item/context": [
@@ -92,26 +97,22 @@
     "views": {
       "your-pr-activitybar": [
         {
-          "id": "yourPrViewId",
+          "id": "yourPrViewId", 
           "name": "GitHub Pull Requests",
-          "icon": "$(git-pull-request)",
-          "contextualTitle": "Your PRs"
-        }
-      ],
-      "your-create-pr-activitybar": [ 
+           "type": "tree" 
+        },
         {
-          "id": "yourCreatePrViewId", 
+          "id": "yourCreatePrViewId",
           "name": "Create Pull Request", 
-          "icon": "$(git-pull-request-create)", 
           "type": "webview", 
-          "contextualTitle": "Create PR Form"
+          "when": "yourExtension:createPrViewVisible"
         }
       ]
     }
   },
   "scripts": {
     "vscode:prepublish": "npm run esbuild-base -- --minify",
-    "esbuild-base": "esbuild ./src/extension.ts ./src/webview/main.ts ./src/webview/styles.css ./src/webview/createPrMain.ts ./src/webview/createPrStyles.css --bundle --external:vscode --format=cjs --platform=node --outdir=dist",
+    "esbuild-base": "esbuild ./src/extension.ts ./src/webview/createPrMain.ts ./src/webview/createPrStyles.css --bundle --external:vscode --format=cjs --platform=node --outdir=dist", 
     "build": "npm run esbuild-base -- --sourcemap",
     "watch": "npm run esbuild-base -- --sourcemap --watch",
     "pretest": "npm run build && npm run lint",

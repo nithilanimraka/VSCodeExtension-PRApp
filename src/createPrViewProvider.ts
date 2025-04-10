@@ -199,9 +199,10 @@ export class CreatePrViewProvider implements vscode.WebviewViewProvider {
                          // Base/head will be undefined, title/desc cleared by webview
                     });
 
-                    // --- Switch focus back to the main PR list view ---
-                    // Use the ID of your TreeView provider's view
+                    // 1. Switch focus back to the main list view
                     await vscode.commands.executeCommand('yourPrViewId.focus');
+                    // 2. Set the context variable back to false to hide this view
+                    await vscode.commands.executeCommand('setContext', 'yourExtension:createPrViewVisible', false);
                     break;
 
                 case 'compareBranches':
