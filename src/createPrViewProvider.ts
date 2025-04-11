@@ -3,6 +3,7 @@ import { getNonce } from './utils'; // Assuming getNonce is accessible (e.g., in
 import { getOctokit } from './auth';
 import type { Endpoints } from "@octokit/types"; // Import types for file data if needed
 import type { PullRequestInfo } from './prDataProvider';
+import { showDiffBetweenBranches } from './extension';
 
 // Define types for Git info we might need
 interface GitInfo {
@@ -33,7 +34,8 @@ type FromCreatePrWebviewMessage =
     | { command: 'cancelPr' }
     | { command: 'getChangedFiles' } // Webview can request file list
     | { command: 'showError'; text: string }
-    | { command: 'compareBranches'; base: string; head: string };
+    | { command: 'compareBranches'; base: string; head: string }
+    | { command: 'showCreatePrDiff'; data: { base: string; head: string; filename: string; status: ChangedFile['status']; owner: string; repo: string } };
 
 // Type for files returned by compareCommits API (subset needed)
 //type ComparisonFile = Endpoints["GET /repos/{owner}/{repo}/compare/{base}...{head}"]['response']['data']['files'][number];
@@ -156,6 +158,28 @@ export class CreatePrViewProvider implements vscode.WebviewViewProvider {
                      }
                     break;
                     }
+
+                case 'showCreatePrDiff': { 
+                    const diffData = data.data;
+                    if (diffData && diffData.owner && diffData.repo && diffData.base && diffData.head && diffData.filename && diffData.status) {
+                            console.log(`Provider received showCreatePrDiff request for: ${diffData.filename}`);
+                        // Call a new function to handle this specific diff request
+                        // Pass the context if needed by createTempFile
+                        showDiffBetweenBranches(
+                            this._extensionContext, // Pass context
+                            diffData.owner,
+                            diffData.repo,
+                            diffData.base,
+                            diffData.head,
+                            diffData.filename,
+                            diffData.status // Pass status
+                        );
+                    } else {
+                            console.error("Received incomplete data for showCreatePrDiff", diffData);
+                            vscode.window.showErrorMessage("Could not show diff: Missing information.");
+                    }
+                        break;
+                }
                 case 'createPrRequest': {
                     // --- Execute the actual PR creation ---
                     const octokit = await getOctokit();
@@ -341,16 +365,18 @@ export class CreatePrViewProvider implements vscode.WebviewViewProvider {
     }
 
      // Helper to send data (avoids repeating the check)
-    private sendDataToWebview(gitInfo: GitInfo | Record<string, never>) { // Allow empty object
-        if (this._view) {
-            // Ensure we're sending to a visible webview if possible
-            // (Might avoid errors if the view is disposed between check and send)
-            if(this._view.visible) {
-                console.log("Sending data to visible webview:", gitInfo);
-               this._view.webview.postMessage({ command: 'loadFormData', data: gitInfo });
-            } else {
-                 console.log("Webview is not visible, skipping postMessage.");
-            }
+    private sendDataToWebview(gitInfo: GitInfo | Partial<GitInfo>) { // Allow empty object
+        if (this._view?.visible) {
+            // Ensure owner and repo from the provider's state are included
+            // if they exist and aren't already in the partial gitInfo
+            const dataToSend = {
+                ...gitInfo, // Include data passed in (like changedFiles)
+                owner: this._currentGitInfo.owner ?? (gitInfo as GitInfo).owner, // Prefer provider's state
+                repo: this._currentGitInfo.repo ?? (gitInfo as GitInfo).repo,   // Prefer provider's state
+            };
+             console.log("Sending data to visible webview:", dataToSend);
+             this._view.webview.postMessage({ command: 'loadFormData', data: dataToSend });
+
         } else {
             console.warn("Attempted to send data, but webview is not available.");
         }

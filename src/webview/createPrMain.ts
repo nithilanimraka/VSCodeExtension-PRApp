@@ -21,7 +21,8 @@ type FromCreatePrWebviewMessage =
     | { command: 'cancelPr' }
     | { command: 'getChangedFiles' }
     | { command: 'showError'; text: string }
-    | { command: 'compareBranches'; base: string; head: string };
+    | { command: 'compareBranches'; base: string; head: string }
+    | { command: 'showCreatePrDiff'; data: { base: string; head: string; filename: string; status: ChangedFile['status']; owner: string; repo: string } };
 
 
 interface VsCodeApi {
@@ -29,6 +30,10 @@ interface VsCodeApi {
     getState(): any;
     setState(state: any): void;
 }
+
+let currentOwner: string | undefined;
+let currentRepo: string | undefined;
+
 declare const acquireVsCodeApi: () => VsCodeApi;
 
 (function () {
@@ -57,6 +62,14 @@ declare const acquireVsCodeApi: () => VsCodeApi;
         if (message.command === 'loadFormData') {
             
             console.log('Webview received form data:', message.data);
+
+            // -- Store owner/repo when data loads --
+            if (message.data?.owner && message.data?.repo) {
+                currentOwner = message.data.owner;
+                currentRepo = message.data.repo;
+                console.log(`Stored owner: ${currentOwner}, repo: ${currentRepo}`);
+            }
+
             // --- ALWAYS Ensure form is visible when data arrives ---
            showWaitingState(false);
 
@@ -304,8 +317,15 @@ declare const acquireVsCodeApi: () => VsCodeApi;
             const status = file.status || '?';
             // --- Add status class to the list item ---
             li.className = `file-list-item status-${status.toLowerCase()}`;
-            // --- End Add ---
-    
+
+             // --- Make clickable & store data ---
+            li.dataset.filename = file.path; // Store filename in data attribute
+            li.dataset.status = status;      // Store status in data attribute
+            li.tabIndex = 0; // Make it focusable
+            li.role = 'button'; // Semantics for accessibility
+            li.classList.add('clickable-file'); // Add class for styling and event handling
+            li.title = `Click to view changes for ${file.path}`; // Add tooltip
+
             // Icon Span
             const iconSpan = document.createElement('span');
             const iconName = getCodiconNameForFile(file.path || '');
@@ -329,6 +349,54 @@ declare const acquireVsCodeApi: () => VsCodeApi;
         });
         filesChangedListDiv.appendChild(ul);
     }
+
+    // --- Add Event Listener for File Clicks ---
+    filesChangedListDiv?.addEventListener('click', (event) => {
+        const target = event.target as HTMLElement;
+        // Find the closest ancestor list item with the 'clickable-file' class
+        const listItem = target.closest<HTMLLIElement>('li.clickable-file');
+
+        if (listItem && listItem.dataset.filename && listItem.dataset.status && currentOwner && currentRepo) {
+            const filename = listItem.dataset.filename;
+            const status = listItem.dataset.status as ChangedFile['status']; // Cast status
+            const base = baseBranchSelect.value;
+            const head = headBranchSelect.value;
+
+            if (!base || !head) {
+                vscode.postMessage({ command: 'showError', text: 'Please select both base and merge branches before viewing diff.' });
+                return;
+            }
+            if (base === head) {
+                vscode.postMessage({ command: 'showError', text: 'Base and merge branches must be different.' });
+                return;
+            }
+
+            console.log(`File clicked: ${filename}, Status: ${status}, Base: ${base}, Head: ${head}`);
+
+            // Send message to extension host to show diff
+            vscode.postMessage({
+                command: 'showCreatePrDiff',
+                data: {
+                    base: base,
+                    head: head,
+                    filename: filename,
+                    status: status,
+                    owner: currentOwner,
+                    repo: currentRepo
+                }
+            });
+        }
+    });
+    // Add keydown listener for accessibility (Enter/Space)
+    filesChangedListDiv?.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+            const target = event.target as HTMLElement;
+            if (target.matches('li.clickable-file')) {
+                event.preventDefault(); // Prevent default space scroll / enter behavior
+                target.click(); // Trigger the click handler
+            }
+        }
+    });
 
     // Initial state on load - Keep showing waiting initially is fine
     // Or maybe hide both initially until first message?

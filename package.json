@@ -17,7 +17,7 @@
     "onCommand:yourExtension.showCreatePullRequestView",
     "onCommand:yourExtension.refreshPrView",
     "onCommand:yourExtension.viewPullRequest",
-    "onCommand:yourExtension.viewItemDiff",
+    "onCommand:yourExtension.viewSpecificFileDiff",
     "onAuthenticationRequest:github"
   ],
   "main": "./dist/extension.js",
@@ -37,11 +37,11 @@
         "title": "Create Pull Request",
         "icon": "$(git-pull-request-create)"
       },
-      {
-        "command": "yourExtension.viewItemDiff",
-        "title": "View Changes",
-        "icon": "$(diff)"
-      },
+      { 
+         "command": "yourExtension.viewSpecificFileDiff",
+         "title": "View File Changes",
+         "category": "Your PR Extension" 
+       },
       {
         "command": "yourExtension.refreshPrView",
         "title": "Refresh Pull Request View",
@@ -71,16 +71,6 @@
         }
       ],
       "view/item/context": [
-        {
-          "command": "yourExtension.viewItemDiff",
-          "when": "view == yourPrViewId && viewItem == pullRequestItem",
-          "group": "inline"
-        },
-        {
-          "command": "yourExtension.viewItemDiff",
-          "when": "view == yourPrViewId && viewItem == pullRequestItem",
-          "group": "navigation@1"
-        }
       ]
     },
     "views": {

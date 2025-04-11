@@ -1,6 +1,10 @@
 import * as vscode from 'vscode';
-import { getOctokit } from './auth'; // Assuming auth functions are in auth.ts
-import { Octokit } from '@octokit/rest'; // Import Octokit type if needed
+import { getOctokit } from './auth'; 
+import { Octokit } from '@octokit/rest'; 
+import type { Endpoints } from "@octokit/types";
+
+// Type for file objects from listFiles endpoint
+type ChangedFileFromApi = Endpoints["GET /repos/{owner}/{repo}/pulls/{pull_number}/files"]["response"]["data"][0];
 
 // Interface for basic PR info (expand as needed)
 export interface PullRequestInfo {
@@ -52,6 +56,7 @@ export class PrDataProvider implements vscode.TreeDataProvider<vscode.TreeItem> 
     }
 
     async getChildren(element?: vscode.TreeItem): Promise<vscode.TreeItem[]> {
+
         if (!this.octokit || !this.currentUser) {
              // Not authenticated yet or failed, maybe return a "Sign in" item
              const signInItem = new vscode.TreeItem("Sign in to GitHub");
@@ -63,24 +68,62 @@ export class PrDataProvider implements vscode.TreeDataProvider<vscode.TreeItem> 
              return [signInItem];
         }
 
-        if (element) {
-            // If we have a parent element (e.g., a category), return its children (PRs)
-            if (element.contextValue === 'prCategory' && element.label) {
+        if (element instanceof PullRequestItem) { // <<< ADD THIS BLOCK
+            // Return children for an expanded PullRequestItem
+
+            if (!element.filesFetched) {
+                // Fetch files if not already fetched
+                try {
+                    const response = await this.octokit.pulls.listFiles({
+                        owner: element.prInfo.repoOwner,
+                        repo: element.prInfo.repoName,
+                        pull_number: element.prInfo.number,
+                        per_page: 300 // Adjust if needed
+                    });
+                    element.changedFiles = response.data;
+                    element.filesFetched = true;
+                } catch (error) {
+                     console.error(`Failed to fetch files for PR #${element.prInfo.number}:`, error);
+                     element.filesFetched = true; // Mark as fetched to avoid retrying immediately
+                     element.changedFiles = undefined; // Ensure no files are shown
+                     // Return an error item?
+                     return [new vscode.TreeItem("Error fetching changed files")];
+                }
+            }
+    
+            // Create child items if files were fetched successfully
+            const children: vscode.TreeItem[] = [new DescriptionItem(element.prInfo)]; // Always add Description first
+            if (element.changedFiles && element.changedFiles.length > 0) {
+                element.changedFiles.forEach(file => {
+                    children.push(new ChangedFileItem(element.prInfo, file));
+                });
+            } else if (element.filesFetched) {
+                 // If fetched but no files found
+                 children.push(new vscode.TreeItem("No changed files found", vscode.TreeItemCollapsibleState.None));
+            }
+    
+            return children;
+    
+        } else if (element instanceof CategoryItem) { // <<< MODIFY THIS (use instanceof)
+            // Existing logic for categories
+            if (element.label) {
                  return this.getPullRequestsForCategory(element.label as string);
             }
-            // Add more conditions if you have deeper levels
             return [];
-        } else {
-            // If no element, return the top-level categories (similar to the screenshot)
-            const categories: vscode.TreeItem[] =[
+        } else if (!element) {
+            // Existing logic for root level (categories)
+             const categories: vscode.TreeItem[] = [ 
                 new CategoryItem("Waiting For My Review", vscode.TreeItemCollapsibleState.Collapsed),
                 new CategoryItem("Assigned To Me", vscode.TreeItemCollapsibleState.Collapsed),
                 new CategoryItem("Created By Me", vscode.TreeItemCollapsibleState.Collapsed),
                 new CategoryItem("All Open", vscode.TreeItemCollapsibleState.Collapsed)
                 // Add "Local Pull Request Branches" if you implement that logic
             ];
-
             return Promise.resolve(categories);
+
+        } else {
+            // Should not happen if hierarchy is only Category -> PR -> (Desc + Files)
+             return [];
         }
     }
 
@@ -136,7 +179,7 @@ export class PrDataProvider implements vscode.TreeDataProvider<vscode.TreeItem> 
                      repoOwner: repoContext.owner, // Assuming search context is reliable
                      repoName: repoContext.repo,
                  };
-                 return new PullRequestItem(prInfo, vscode.TreeItemCollapsibleState.None);
+                 return new PullRequestItem(prInfo);
             });
 
         } catch (error) {
@@ -191,27 +234,131 @@ class CategoryItem extends vscode.TreeItem {
 }
 
 export class PullRequestItem extends vscode.TreeItem { // Make sure to EXPORT if needed by command handler type check
+    public changedFiles?: ChangedFileFromApi[]; // To store fetched files
+    public filesFetched: boolean = false; // Flag to check if fetched
+
     constructor(
         public readonly prInfo: PullRequestInfo,
-        // Usually PR items aren't expandable in this view
-        public readonly collapsibleState: vscode.TreeItemCollapsibleState = vscode.TreeItemCollapsibleState.None
+        
+        // Collapsible state can be passed in, default to collapsed
+        // This allows for nested PRs or categories if needed
+        public readonly collapsibleState: vscode.TreeItemCollapsibleState = vscode.TreeItemCollapsibleState.Collapsed // Default to collapsed
     ) {
         super(`#${prInfo.number}: ${prInfo.title}`, collapsibleState);
 
         this.description = `by ${prInfo.author}`;
-        this.tooltip = `${prInfo.title}\nAuthor: ${prInfo.author}\nClick to view details`;
+        this.tooltip = `${prInfo.title}\nAuthor: ${prInfo.author}\nClick to expand`; 
+        this.contextValue = 'pullRequestItem'; // Used for context menu contributions
+        this.iconPath = new vscode.ThemeIcon('git-pull-request'); 
+    }
+}
 
-        // Command to execute when the item itself is clicked (opens webview)
+
+class DescriptionItem extends vscode.TreeItem {
+    constructor(prInfo: PullRequestInfo) {
+        super("Description", vscode.TreeItemCollapsibleState.None);
+        this.iconPath = new vscode.ThemeIcon('book'); // Or 'note'
         this.command = {
-            command: 'yourExtension.viewPullRequest', // Command defined in package.json
+            command: 'yourExtension.viewPullRequest', // Command to open detail webview
             title: 'View Pull Request Details',
-            arguments: [this.prInfo] // Pass PR info to the command handler
+            arguments: [prInfo] // Pass PR info
         };
+        this.contextValue = 'descriptionItem';
+    }
+}
 
-        // **NEW: Set context value for menu contributions**
-        this.contextValue = 'pullRequestItem';
+class ChangedFileItem extends vscode.TreeItem {
+    constructor(
+        public readonly prInfo: PullRequestInfo,
+        public readonly fileData: ChangedFileFromApi // Store the specific file data
+    ) {
+        // Use filename for the label
+        super(fileData.filename, vscode.TreeItemCollapsibleState.None);
 
-        // Optional: Icon based on PR state (open, merged, closed)
-        this.iconPath = new vscode.ThemeIcon('git-pull-request');
+        // Use status for description
+        this.description = this.mapStatus(fileData.status);
+
+        // Add tooltip showing full path and status
+        this.tooltip = `${fileData.filename}\nStatus: ${fileData.status}`;
+
+        // ICON COLOR LOGIC
+        const status = fileData.status;
+        let iconColorId: string | undefined;
+
+        // Map file status to standard Git decoration theme colors
+        switch (status) {
+            case 'added':
+                iconColorId = 'gitDecoration.addedResourceForeground'; // Green
+                break;
+            case 'modified':
+            case 'changed': // Treat file type changes like modifications
+                iconColorId = 'gitDecoration.modifiedResourceForeground'; // Blue/Yellow (theme dependent)
+                break;
+             case 'renamed': // Renamed often shown as modified in lists
+                 iconColorId = 'gitDecoration.renamedResourceForeground'; // Often blue
+                 break;
+            case 'removed':
+                iconColorId = 'gitDecoration.deletedResourceForeground'; // Red/Gray (theme dependent)
+                break;
+            case 'copied': // Copied often shown as added
+                 iconColorId = 'gitDecoration.addedResourceForeground'; // Green
+                 break;
+            // 'untracked' or 'ignored' shouldn't typically appear in PR files
+            // case 'untracked': iconColorId = 'gitDecoration.untrackedResourceForeground'; break;
+            // case 'ignored': iconColorId = 'gitDecoration.ignoredResourceForeground'; break;
+            default:
+                iconColorId = undefined; // Use default icon color
+        }
+
+        // Get the base file icon ID (string) using a helper
+        const baseIconId = this.getFileIconId(fileData.filename);
+
+        // Create ThemeIcon with base icon ID and optional ThemeColor
+        this.iconPath = new vscode.ThemeIcon(
+            baseIconId, // The ID of the icon (e.g., 'file-code')
+            iconColorId ? new vscode.ThemeColor(iconColorId) : undefined // Apply color if found
+        );
+
+        this.command = {
+            command: 'yourExtension.viewSpecificFileDiff',
+            title: 'View File Changes',
+            arguments: [prInfo, fileData]
+        };
+        this.contextValue = 'changedFileItem';
+    }
+
+    // Helper to map API status to single characters (optional)
+    private mapStatus(status: string): string {
+         switch (status) {
+            case 'added': return 'A';
+            case 'removed': return 'D';
+            case 'modified': return 'M';
+            case 'renamed': return 'R';
+            case 'copied': return 'C'; // Less common
+            case 'changed': return 'M'; // Treat 'changed' (type change) as 'modified'
+            case 'unchanged': return ''; // Should not appear in listFiles really
+            default: return '?';
+        }
+    }
+
+    // Helper to get file icon (adapt from createPrMain.ts or simplify)
+    private getFileIconId(filename: string): string {
+        const lowerFilename = filename.toLowerCase();
+        if (lowerFilename.endsWith('.py')) return 'file-code';
+        if (lowerFilename.endsWith('.js')) return 'file-code';
+        if (lowerFilename.endsWith('.ts')) return 'file-code';
+        if (lowerFilename.endsWith('.java')) return 'file-code';
+        if (lowerFilename.endsWith('.cs')) return 'file-code';
+        if (lowerFilename.endsWith('.html')) return 'file-code';
+        if (lowerFilename.endsWith('.css')) return 'file-code';
+        if (lowerFilename.endsWith('.json')) return 'json';
+        if (lowerFilename.endsWith('.md')) return 'markdown';
+        if (lowerFilename.endsWith('.txt')) return 'file-text';
+        if (lowerFilename.includes('requirements')) return 'checklist';
+        if (lowerFilename.includes('dockerfile')) return 'docker';
+        if (lowerFilename.includes('config') || lowerFilename.endsWith('.yml') || lowerFilename.endsWith('.yaml')) return 'settings-gear';
+        if (lowerFilename.endsWith('.git') || lowerFilename.includes('gitignore') || lowerFilename.includes('gitattributes')) return 'git-commit';
+        if (lowerFilename.endsWith('.png') || lowerFilename.endsWith('.jpg') || lowerFilename.endsWith('.jpeg') || lowerFilename.endsWith('.gif') || lowerFilename.endsWith('.svg')) return 'file-media';
+        return 'file'; // Default file icon ID
     }
 }

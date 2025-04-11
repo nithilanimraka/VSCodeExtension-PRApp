@@ -16,6 +16,7 @@ type IssueComment = Endpoints["GET /repos/{owner}/{repo}/issues/{issue_number}/c
 type ReviewComment = Endpoints["GET /repos/{owner}/{repo}/pulls/{pull_number}/comments"]["response"]["data"][0];
 type Review = Endpoints["GET /repos/{owner}/{repo}/pulls/{pull_number}/reviews"]["response"]["data"][0];
 type CommitListItem = Endpoints["GET /repos/{owner}/{repo}/pulls/{pull_number}/commits"]["response"]["data"][0];
+type ChangedFileFromApi = Endpoints["GET /repos/{owner}/{repo}/pulls/{pull_number}/files"]["response"]["data"][0];
 
 type CheckConclusion = "success" | "failure" | "neutral" | "cancelled" | "skipped" | "timed_out" | "action_required" | null | undefined;
 type CheckStatus = "queued" | "in_progress" | "completed" | null | undefined;
@@ -69,6 +70,12 @@ interface CommitTimelineItem extends TimelineItemBase {
     type: 'commit';
     data: CommitListItem;
 }
+
+interface ChangedFile {
+    path: string;
+    status: 'A' | 'M' | 'D' | 'R' | 'C' | '?';
+}
+
 type TimelineItem = ReviewTimelineItem | ReviewCommentTimelineItem | IssueCommentTimelineItem | CommitTimelineItem;
 
 // --- Export Types needed by webview/main.ts ---
@@ -150,16 +157,19 @@ export function activate(context: vscode.ExtensionContext) {
     ));
 
 
-    // NEW Command for the sidebar diff button
-    context.subscriptions.push(vscode.commands.registerCommand('yourExtension.viewItemDiff', async (item: PullRequestItem) => {
-        // This command receives the TreeItem instance directly
-        if (item && item.prInfo) {
-            await fetchAndShowDiff(context, item.prInfo);
-        } else {
-            console.error("viewItemDiff called with invalid item:", item);
-            vscode.window.showErrorMessage("Could not get PR info to show diff.");
+    context.subscriptions.push(vscode.commands.registerCommand(
+        'yourExtension.viewSpecificFileDiff',
+        // Command handler receives arguments passed from ChangedFileItem's command
+        async (prInfo: PullRequestInfo, fileData: ChangedFileFromApi) => {
+            if (prInfo && fileData) {
+                 // Call the modified diff function with the specific file data
+                 await fetchAndShowDiffForFile(context, prInfo, fileData);
+            } else {
+                 console.error("viewSpecificFileDiff called with invalid arguments:", prInfo, fileData);
+                 vscode.window.showErrorMessage("Could not get file information to show diff.");
+            }
         }
-    }));
+    ));
 
     // // View Diff Command
     // context.subscriptions.push(vscode.commands.registerCommand('yourExtension.viewDiff', async (prInfo: PullRequestInfo) => {
@@ -805,7 +815,7 @@ async function fetchAndUpdateMergeStatus(
 // =================================
 // DIFF VIEW LOGIC
 // =================================
-async function fetchAndShowDiff(context: vscode.ExtensionContext, prInfo: PullRequestInfo) {
+async function fetchAndShowDiffForFile(context: vscode.ExtensionContext, prInfo: PullRequestInfo, file: ChangedFileFromApi ) {
     const octokit = await getOctokit();
     if (!octokit) { vscode.window.showErrorMessage("Please sign in to GitHub first."); return; };
 
@@ -821,66 +831,45 @@ async function fetchAndShowDiff(context: vscode.ExtensionContext, prInfo: PullRe
             const baseSha = pull.base.sha;
             const headSha = pull.head.sha;
 
-             progress.report({ message: "Fetching changed files..." });
-            const { data: files } = await octokit.pulls.listFiles({
-                 owner: prInfo.repoOwner,
-                 repo: prInfo.repoName,
-                 pull_number: prInfo.number,
-                 per_page: 300 // Handle up to 300 files, pagination needed for more
-            });
+            progress.report({ message: `Processing ${file.filename}...` });
+            const filename = file.filename; // Use filename from input 'file'
 
-            if (!files || files.length === 0) {
-                vscode.window.showInformationMessage("No changes detected in this pull request.");
-                return;
-            }
-
-            // Let user pick a file if more than one? For now, just use the first.
-            // In a real app, you'd show a Quick Pick list here.
-             const file = files[0];
-             progress.report({ message: `Diffing ${file.filename}...` });
-
-             if (file.status === 'added') {
-                 try {
-                     const { data: contentData } = await octokit.repos.getContent({ owner: prInfo.repoOwner, repo: prInfo.repoName, path: file.filename, ref: headSha });
-                     // Need to handle potential array response if it's a directory (unlikely for listFiles result)
-                     const headContent = Buffer.from((contentData as any).content, 'base64').toString('utf8');
-                     // Create empty temp file for base
-                     const baseUri = await createTempFile(context, `${prInfo.number}-${baseSha}-EMPTY-${file.filename}`, '');
-                     const headUri = await createTempFile(context, `${prInfo.number}-${headSha}-${file.filename}`, headContent);
-                     const diffTitle = `${file.filename} (Added in PR #${prInfo.number})`;
-                     vscode.commands.executeCommand('vscode.diff', baseUri, headUri, diffTitle);
-                 } catch (err) { handleDiffError(err, file.filename); }
-
-             } else if (file.status === 'removed') {
-                  try {
-                     const { data: contentData } = await octokit.repos.getContent({ owner: prInfo.repoOwner, repo: prInfo.repoName, path: file.filename, ref: baseSha }); // Get content from BASE commit
-                     const baseContent = Buffer.from((contentData as any).content, 'base64').toString('utf8');
-                     const baseUri = await createTempFile(context, `${prInfo.number}-${baseSha}-${file.filename}`, baseContent);
-                     // Create empty temp file for head
-                     const headUri = await createTempFile(context, `${prInfo.number}-${headSha}-REMOVED-${file.filename}`, '');
-                     const diffTitle = `${file.filename} (Removed in PR #${prInfo.number})`;
-                     vscode.commands.executeCommand('vscode.diff', baseUri, headUri, diffTitle);
-                 } catch (err) { handleDiffError(err, file.filename); }
-
-             } else { // Modified, renamed etc.
-                 try {
-                    // Fetch file content for base and head commits
-                     const { data: baseContentData } = await octokit.repos.getContent({ owner: prInfo.repoOwner, repo: prInfo.repoName, path: file.filename, ref: baseSha });
-                     const { data: headContentData } = await octokit.repos.getContent({ owner: prInfo.repoOwner, repo: prInfo.repoName, path: file.filename, ref: headSha });
-
-                     const baseContent = Buffer.from((baseContentData as any).content, 'base64').toString('utf8');
-                     const headContent = Buffer.from((headContentData as any).content, 'base64').toString('utf8');
-
-                    // Create temporary files
-                    const baseUri = await createTempFile(context, `${prInfo.number}-${baseSha}-${file.filename}`, baseContent);
-                    const headUri = await createTempFile(context, `${prInfo.number}-${headSha}-${file.filename}`, headContent);
-
-                    // Execute the built-in diff command
-                    const diffTitle = `${file.filename} (PR #${prInfo.number})`;
+            // Use file.status from input 'file'
+            if (file.status === 'added') {
+                try {
+                    const { data: contentData } = await octokit.repos.getContent({ owner: prInfo.repoOwner, repo: prInfo.repoName, path: filename, ref: headSha });
+                    const headContent = Buffer.from((contentData as any).content, 'base64').toString('utf8');
+                    const baseUri = await createTempFile(context, `<span class="math-inline">\{prInfo\.number\}\-</span>{baseSha}-EMPTY-${filename}`, '');
+                    const headUri = await createTempFile(context, `<span class="math-inline">\{prInfo\.number\}\-</span>{headSha}-${filename}`, headContent);
+                    const diffTitle = `${filename} (Added in PR #${prInfo.number})`;
                     vscode.commands.executeCommand('vscode.diff', baseUri, headUri, diffTitle);
-                 } catch (err) { handleDiffError(err, file.filename); }
-             }
-        });
+                } catch (err) { handleDiffError(err, filename); }
+
+            } else if (file.status === 'removed') {
+                try {
+                    const { data: contentData } = await octokit.repos.getContent({ owner: prInfo.repoOwner, repo: prInfo.repoName, path: filename, ref: baseSha });
+                    const baseContent = Buffer.from((contentData as any).content, 'base64').toString('utf8');
+                    const baseUri = await createTempFile(context, `<span class="math-inline">\{prInfo\.number\}\-</span>{baseSha}-${filename}`, baseContent);
+                    const headUri = await createTempFile(context, `<span class="math-inline">\{prInfo\.number\}\-</span>{headSha}-REMOVED-${filename}`, '');
+                    const diffTitle = `${filename} (Removed in PR #${prInfo.number})`;
+                    vscode.commands.executeCommand('vscode.diff', baseUri, headUri, diffTitle);
+                } catch (err) { handleDiffError(err, filename); }
+
+            } else { // Modified, renamed etc.
+                try {
+                    const { data: baseContentData } = await octokit.repos.getContent({ owner: prInfo.repoOwner, repo: prInfo.repoName, path: filename, ref: baseSha });
+                    const { data: headContentData } = await octokit.repos.getContent({ owner: prInfo.repoOwner, repo: prInfo.repoName, path: filename, ref: headSha });
+                    const baseContent = Buffer.from((baseContentData as any).content, 'base64').toString('utf8');
+                    const headContent = Buffer.from((headContentData as any).content, 'base64').toString('utf8');
+                    const baseUri = await createTempFile(context, `<span class="math-inline">\{prInfo\.number\}\-</span>{baseSha}-${filename}`, baseContent);
+                    const headUri = await createTempFile(context, `<span class="math-inline">\{prInfo\.number\}\-</span>{headSha}-${filename}`, headContent);
+                    const diffTitle = `${filename} (Changes in PR ${prInfo.number})`;
+                    vscode.commands.executeCommand('vscode.diff', baseUri, headUri, diffTitle);
+                } catch (err) { handleDiffError(err, filename); }
+            }
+              // End of using selectedFile
+         }); // End withProgress
+
      } catch (err) { // Catch errors from the overall process (e.g., listFiles)
         console.error("Error in fetchAndShowDiff:", err);
         if(err instanceof Error) {
@@ -890,6 +879,98 @@ async function fetchAndShowDiff(context: vscode.ExtensionContext, prInfo: PullRe
         }
      }
 }
+
+export async function showDiffBetweenBranches(
+    context: vscode.ExtensionContext, // Needed for createTempFile
+    owner: string,
+    repo: string,
+    baseBranch: string,
+    headBranch: string,
+    filename: string,
+    status: ChangedFile['status'] // Receive status from webview
+) {
+    console.log(`Showing diff for ${filename} between <span class="math-inline">\{baseBranch\}\.\.\.</span>{headBranch}`);
+    const octokit = await getOctokit();
+    if (!octokit) { vscode.window.showErrorMessage("Please sign in to GitHub first."); return; }
+
+    // We don't have a PR number here, use branches and filename for uniqueness if needed
+    const uniquePrefix = `<span class="math-inline">\{owner\}\-</span>{repo}-<span class="math-inline">\{baseBranch\.replace\(/\[/\\\\?%\*\:\|"<\>\]/g, '\-'\)\}\-</span>{headBranch.replace(/[/\\?%*:|"<>]/g, '-')}`;
+
+    try {
+        await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: `Workspaceing Diff for ${filename}...`, cancellable: false }, async (progress) => {
+
+            let baseContent = '';
+            let headContent = '';
+            let diffTitle = `<span class="math-inline">\{filename\} \(</span>{baseBranch}...${headBranch})`;
+            let baseUri: vscode.Uri | undefined;
+            let headUri: vscode.Uri | undefined;
+
+            progress.report({ message: `Workspaceing base content (${baseBranch})...` });
+            // Fetch base content unless file was added
+            if (status !== 'A') { // Changed 'added' to 'A'
+                try {
+                    const { data: baseData } = await octokit.repos.getContent({ owner, repo, path: filename, ref: baseBranch });
+                    baseContent = Buffer.from((baseData as any).content, 'base64').toString('utf8');
+                } catch (err: any) {
+                     // If file not found on base, treat as added (might happen if status calculation was slightly off or history changed)
+                    if (err.status === 404) {
+                        console.warn(`File ${filename} not found on base branch ${baseBranch}, treating as added.`);
+                        status = 'A'; // Adjust status based on fetch result
+                    } else {
+                        throw err; // Re-throw other errors
+                    }
+                }
+            }
+
+            progress.report({ message: `Workspaceing head content (${headBranch})...` });
+             // Fetch head content unless file was removed
+             if (status !== 'D') { // Changed 'removed' to 'D'
+                try {
+                     const { data: headData } = await octokit.repos.getContent({ owner, repo, path: filename, ref: headBranch });
+                     headContent = Buffer.from((headData as any).content, 'base64').toString('utf8');
+                } catch (err: any) {
+                     // If file not found on head, treat as removed
+                     if (err.status === 404) {
+                         console.warn(`File ${filename} not found on head branch ${headBranch}, treating as removed.`);
+                         status = 'D'; // Adjust status based on fetch result
+                     } else {
+                         throw err; // Re-throw other errors
+                     }
+                }
+             }
+
+
+            // Create Temp Files based on adjusted status
+             progress.report({ message: `Creating temp files...` });
+            if (status === 'A') { // Added
+                baseUri = await createTempFile(context, `<span class="math-inline">\{uniquePrefix\}\-EMPTY\-</span>{filename}`, ''); // Empty base
+                headUri = await createTempFile(context, `<span class="math-inline">\{uniquePrefix\}\-</span>{headBranch}-${filename}`, headContent);
+                diffTitle = `${filename} (Added in ${headBranch} vs ${baseBranch})`;
+            } else if (status === 'D') { // Removed
+                baseUri = await createTempFile(context, `<span class="math-inline">\{uniquePrefix\}\-</span>{baseBranch}-${filename}`, baseContent);
+                headUri = await createTempFile(context, `<span class="math-inline">\{uniquePrefix\}\-EMPTY\-</span>{filename}`, ''); // Empty head
+                diffTitle = `${filename} (Removed in ${headBranch} vs ${baseBranch})`;
+            } else { // Modified, Renamed, Copied
+                 baseUri = await createTempFile(context, `<span class="math-inline">\{uniquePrefix\}\-</span>{baseBranch}-${filename}`, baseContent);
+                 headUri = await createTempFile(context, `<span class="math-inline">\{uniquePrefix\}\-</span>{headBranch}-${filename}`, headContent);
+                 diffTitle = `<span class="math-inline">\{filename\} \(</span>{baseBranch}...${headBranch})`;
+            }
+
+            // Show diff
+            if (baseUri && headUri) {
+                vscode.commands.executeCommand('vscode.diff', baseUri, headUri, diffTitle);
+            } else {
+                 throw new Error("Could not create URIs for diff view.");
+            }
+        });
+    } catch (err) {
+         console.error(`Error showing diff between branches for ${filename}:`, err);
+         // Use handleDiffError or show a specific message
+         // handleDiffError(err, filename); // handleDiffError might assume PR context
+         vscode.window.showErrorMessage(`Failed to show diff for ${filename}: ${err instanceof Error ? err.message : String(err)}`);
+    }
+}
+
 
 // Helper for specific diff errors
 function handleDiffError(err: any, filename: string) {

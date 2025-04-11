@@ -244,3 +244,25 @@ textarea {
 #cancel-button:hover {
     background-color: var(--vscode-button-secondaryHoverBackground);
 }
+
+/* Style clickable file items */
+.file-list-item.clickable-file {
+    cursor: pointer; /* Hand cursor on hover */
+    border-radius: 2px;
+}
+
+.file-list-item.clickable-file:hover {
+    background-color: var(--vscode-list-hoverBackground); /* Use standard hover */
+    color: var(--vscode-list-hoverForeground);
+}
+ /* Ensure path color doesn't get overridden on hover by default link styles */
+ .file-list-item.clickable-file:hover .file-path {
+     color: inherit; /* Inherit color from parent li on hover */
+ }
+
+
+.file-list-item.clickable-file:focus {
+     outline: 1px solid var(--vscode-focusBorder); /* Focus outline for accessibility */
+     outline-offset: -1px;
+     background-color: var(--vscode-list-focusBackground);
+}
