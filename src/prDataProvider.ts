@@ -104,7 +104,7 @@ export class PrDataProvider implements vscode.TreeDataProvider<vscode.TreeItem> 
     
             return children;
     
-        } else if (element instanceof CategoryItem) { // <<< MODIFY THIS (use instanceof)
+        } else if (element instanceof CategoryItem) { 
             // Existing logic for categories
             if (element.label) {
                  return this.getPullRequestsForCategory(element.label as string);
