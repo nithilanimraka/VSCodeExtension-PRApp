@@ -10,8 +10,8 @@
     "Other"
   ],
   "extensionDependencies": [
-		"vscode.git"
-	],
+    "vscode.git"
+  ],
   "activationEvents": [
     "onView:yourPrViewId",
     "onCommand:yourExtension.showCreatePullRequestView",
@@ -37,11 +37,11 @@
         "title": "Create Pull Request",
         "icon": "$(git-pull-request-create)"
       },
-      { 
-         "command": "yourExtension.viewSpecificFileDiff",
-         "title": "View File Changes",
-         "category": "Your PR Extension" 
-       },
+      {
+        "command": "yourExtension.viewSpecificFileDiff",
+        "title": "View File Changes",
+        "category": "Your PR Extension"
+      },
       {
         "command": "yourExtension.refreshPrView",
         "title": "Refresh Pull Request View",
@@ -64,26 +64,25 @@
           "when": "view == yourPrViewId",
           "group": "navigation"
         },
-        { 
+        {
           "command": "yourExtension.showCreatePullRequestView",
-          "when": "view == yourPrViewId", 
+          "when": "view == yourPrViewId",
           "group": "navigation@1"
         }
       ],
-      "view/item/context": [
-      ]
+      "view/item/context": []
     },
     "views": {
       "your-pr-activitybar": [
         {
-          "id": "yourPrViewId", 
+          "id": "yourPrViewId",
           "name": "GitHub Pull Requests",
-           "type": "tree" 
+          "type": "tree"
         },
         {
           "id": "yourCreatePrViewId",
-          "name": "Create Pull Request", 
-          "type": "webview", 
+          "name": "Create Pull Request",
+          "type": "webview",
           "when": "yourExtension:createPrViewVisible"
         }
       ]
@@ -91,7 +90,7 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run esbuild-base -- --minify",
-    "esbuild-base": "esbuild ./src/extension.ts ./src/webview/createPrMain.ts ./src/webview/createPrStyles.css --bundle --external:vscode --format=cjs --platform=node --outdir=dist", 
+    "esbuild-base": "esbuild ./src/extension.ts ./src/webview/main.ts ./src/webview/styles.css ./src/webview/createPrMain.ts ./src/webview/createPrStyles.css --bundle --external:vscode --format=cjs --platform=node --outdir=dist/ --entry-names=[dir]/[name] --outbase=src",
     "build": "npm run esbuild-base -- --sourcemap",
     "watch": "npm run esbuild-base -- --sourcemap --watch",
     "pretest": "npm run build && npm run lint",

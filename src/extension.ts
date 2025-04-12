@@ -8,9 +8,6 @@ import type { PullRequestInfo } from './prDataProvider';
 import { CreatePrViewProvider } from './createPrViewProvider'; 
 import { getNonce, escapeHtml } from './utils'; 
 
-import * as fs from 'fs';
-import * as path from 'path';
-
 // --- Type Definitions for GitHub API Responses (can be expanded) ---
 type IssueComment = Endpoints["GET /repos/{owner}/{repo}/issues/{issue_number}/comments"]["response"]["data"][0];
 type ReviewComment = Endpoints["GET /repos/{owner}/{repo}/pulls/{pull_number}/comments"]["response"]["data"][0];
@@ -684,7 +681,6 @@ async function getWebviewTimelineHtml(
         <hr class="status-timeline-separator">
 
         <div id="pr-description-area" class="pr-description-area">
-             {/* Content will be added by JS */}
              Loading description...
         </div>
 
@@ -712,7 +708,6 @@ async function getWebviewTimelineHtml(
     </body>
     </html>`;
 }
-// --- End Simplified getWebviewTimelineHtml ---
 
 
 // =================================
