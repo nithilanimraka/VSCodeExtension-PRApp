@@ -259,150 +259,220 @@ type FromWebviewMessage =
     // --- NEW: Helper to generate HTML for a single review comment (used for nesting) ---
     // Simplified version of generateReviewCommentHtml, focusing on the comment itself
     
+    // src/webview/main.ts
+
     function generateNestedReviewCommentHtml(comment: ReviewComment): string {
         const user = comment.user;
         const createdAt = comment.created_at ? new Date(comment.created_at).toLocaleString() : '';
-        const commentBody = generateCommentBodyHtml(comment); // Uses helper
+        const commentBody = generateCommentBodyHtml(comment); // Uses helper defined elsewhere
     
         let filteredHunkHtml = '';
         const diffHunk = comment.diff_hunk;
         const commentEndLine = (typeof comment.line === 'number') ? comment.line : null;
         const commentStartLine = (typeof comment.start_line === 'number') ? comment.start_line : commentEndLine;
-        const isSingleLineComment = (commentStartLine === commentEndLine);
-        const CONTEXT_LINES_BEFORE = 3;
-    
+        
         if (diffHunk && commentEndLine !== null && commentStartLine !== null) {
-            // --- ADD LOGS HERE ---
-            //console.log(`--- Hunk Details for Comment #${comment.id} ---`);
-            //console.log(`Target Range: ${commentStartLine} - ${commentEndLine}`);
-            //console.log(`Raw Diff Hunk Received:\n${diffHunk}`);
-            // --- END LOGS ---
-            const lines = diffHunk.split('\n'); 
+            const lines = diffHunk.split('\n');
             let styledLinesHtml = '';
-            let currentFileLineNum = -1;
-            let hunkHeaderFound = false;
             let parseError = false;
-            let hunkStartLine = -1;
     
-            for (const line of lines) {
-                if (parseError) break;
+            // --- Pre-analyze Hunk to Determine Comment Context (REVISED HEURISTIC V2) ---
+            // This determines if the line numbers [start..end] refer to OLD (-) or NEW (+) file lines
+            let commentTargetsDeletion = false;
+            try {
+                let tempOldLineNum = -1;
+                let inHunk = false;
+                let deletionFoundInRange = false;
+                const tempLines = diffHunk.split('\n'); 
     
-                const trimmedLine = line.trim();
-                let lineClass = '';
-                let displayLineNum = '';
-                let fileLineNumForThisLine = -1;
-    
-                if (trimmedLine.startsWith('@@') && !hunkHeaderFound) {
-                    hunkHeaderFound = true;
-                    lineClass = 'hunk-header';
-                    // Regex uses '\\d' to represent '\d' in the JS regex engine
-                    const match = trimmedLine.match(/^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
-                    if (match && match[1]) {
-                        hunkStartLine = parseInt(match[1], 10);
-                        currentFileLineNum = hunkStartLine;
-                        displayLineNum = '...';
-                    } else {
-                        console.error(`FAILED to parse hunk header: "${trimmedLine}"`);
-                        parseError = true;
-                        styledLinesHtml = `<span>Error parsing diff hunk header.</span>`;
-                    }
-                    continue; // Move to next line after processing header or error
-                }
-    
-                if (!hunkHeaderFound || currentFileLineNum === -1) continue; // Skip lines before valid header
-    
-                // Determine line type and calculate file line number *for this line*
-                if (trimmedLine.startsWith('+')) {
-                    lineClass = 'addition';
-                    fileLineNumForThisLine = currentFileLineNum;
-                    currentFileLineNum++;
-                } else if (trimmedLine.startsWith('-')) {
-                    lineClass = 'deletion';
-                    fileLineNumForThisLine = -1; // No corresponding file line number in the 'new' file
-                } else { // Context or empty line
-                    lineClass = 'context';
-                    if (line.length > 0) { // Only number non-empty context lines
-                         fileLineNumForThisLine = currentFileLineNum;
-                         currentFileLineNum++;
-                    } else {
-                         fileLineNumForThisLine = -1; // Don't check empty lines against range
-                    }
-                }
-
-                // --- Add Detailed Logging Before Filter ---
-            let lowerBound = -1; // For debugging log
-            if (isSingleLineComment) { lowerBound = Math.max(hunkStartLine, commentEndLine - CONTEXT_LINES_BEFORE); }
-            // console.log(
-            //     `  Checking Line: fileNum=${fileLineNumForThisLine}, type=${lineClass}, ` +
-            //     `targetRange=[${commentStartLine}-${commentEndLine}], single=${isSingleLineComment}, ` +
-            //     `hunkStart=${hunkStartLine}, lowerBound=${lowerBound !== -1 ? lowerBound : 'N/A'}`
-            // );
-            // // --- End Detailed Logging ---
-    
-                // --- Filter Logic ---
-                let keepLine = false;
-                // Keep Add(+) or Context( ) lines based on calculated file line number
-                if (fileLineNumForThisLine !== -1 && (lineClass === 'addition' || lineClass === 'context')) {
-                    if (isSingleLineComment) {
-                        // For single lines, show line L and up to CONTEXT_LINES_BEFORE
-                        const lowerBound = Math.max(hunkStartLine, commentEndLine - CONTEXT_LINES_BEFORE);
-                        if (fileLineNumForThisLine >= lowerBound && fileLineNumForThisLine <= commentEndLine) {
-                            keepLine = true;
+                for (const line of lines) {
+                    if (line.startsWith('@@')) {
+                        const match = line.match(/^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/);
+                        if (match && match[1]) {
+                            tempOldLineNum = parseInt(match[1], 10);
+                            inHunk = true;
+                        } else {
+                            inHunk = false;
                         }
-                    } else {
-                        // For multi-lines, show the exact range S to L
-                        if (fileLineNumForThisLine >= commentStartLine && fileLineNumForThisLine <= commentEndLine) {
-                            keepLine = true;
+                        continue;
+                    }
+                    if (inHunk && tempOldLineNum !== -1) {
+                        if (line.startsWith('-')) {
+                            if (tempOldLineNum >= commentStartLine && tempOldLineNum <= commentEndLine) {
+                                 deletionFoundInRange = true;
+                                 break; // Found one, context determined
+                            }
+                            tempOldLineNum++;
+                        } else if (line.startsWith('+')) {
+                             // Doesn't increment old line number
+                        } else if (line.startsWith(' ')) {
+                             tempOldLineNum++;
                         }
                     }
                 }
-    
-                if (keepLine) {
-                    displayLineNum = String(fileLineNumForThisLine);
-                    const escapedLine = escapeHtml(line); // Assumes escapeHtml is defined
-    
-                    // --- **VERIFY THIS LINE IS EXACTLY AS BELOW** ---
-                    styledLinesHtml += `<span class="line ${lineClass}">` +
-                                           `<span class="line-num">${displayLineNum}</span>` +
-                                           `<span class="line-content ${lineClass}">${escapedLine}</span>` +
-                                       `</span>`; // No trailing newline
-                    // --- **END VERIFY** ---
-                }
-            } // End for loop
-    
-            // Wrap the filtered lines in the outer elements
-            if (styledLinesHtml && !parseError) {
-               filteredHunkHtml = `<div class="diff-hunk"><pre><code>${styledLinesHtml}</code></pre></div>`;
-            } else if (parseError) {
-                filteredHunkHtml = `<div class="diff-hunk"><pre><code>${styledLinesHtml}</code></pre></div>`; // Contains error message
+                commentTargetsDeletion = deletionFoundInRange;
+                console.log(`Hunk Pre-analysis V2: commentTargetsDeletion = ${commentTargetsDeletion} for target [${commentStartLine}-${commentEndLine}]`);
+            } catch (e) {
+                console.error("Error during hunk pre-analysis V2:", e);
+                commentTargetsDeletion = false;
             }
+            // --- End Pre-analysis V2 ---
+    
+            // --- Rendering Pass ---
+            const linesToRender = diffHunk.split('\n');
+            console.log(`Rendering diff hunk for comment #${comment.id} with ${linesToRender.length} lines.`);
+            console.log(diffHunk);
+            // Optional: Remove trailing empty line if present after split
+            if (linesToRender.length > 0 && linesToRender[linesToRender.length - 1] === '') {
+                linesToRender.pop();
+            }
+    
+            let currentOldLineNum = -1;
+            let currentNewLineNum = -1;
+            let hunkHeaderParsed = false; 
+    
+            for (const line of linesToRender) {
+                if (parseError) break;
+   
+                let lineClass = '';
+                let displayOldLineNum = '';
+                let displayNewLineNum = '';
+                let lineContent = '';
+                let oldLineNumForThis = -1;
+                let newLineNumForThis = -1;
+                let isHunkHeader = false; // Flag for this specific line
+   
+                if (line.startsWith('@@')) {
+                    isHunkHeader = true;
+                    const match = line.match(/^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/);
+                    if (match && match[1] && match[3]) {
+                        // Initialize counters based on the STARTING line numbers from the header
+                        currentOldLineNum = parseInt(match[1], 10);
+                        currentNewLineNum = parseInt(match[3], 10);
+                        hunkHeaderParsed = true; // Mark that we've processed the header
+                        console.log(`Hunk Header Parsed: Old Start=${currentOldLineNum}, New Start=${currentNewLineNum}`);
+                    } else {
+                        parseError = true; console.error(`Error parsing hunk header: ${escapeHtml(line)}`);
+                    }
+                    // DO NOT RENDER HEADER - Skip to next iteration
+                    continue;
+                }
+   
+                // Only process lines AFTER a header has been successfully parsed
+                if (!hunkHeaderParsed) continue;
+   
+                // --- Calculate line numbers and classes for CONTENT lines ---
+                if (line.startsWith('+')) {
+                    lineClass = 'addition'; lineContent = line.substring(1);
+                    // Assign the CURRENT counter value, THEN increment for the NEXT line
+                    newLineNumForThis = currentNewLineNum; displayNewLineNum = String(newLineNumForThis);
+                    currentNewLineNum++;
+                } else if (line.startsWith('-')) {
+                    lineClass = 'deletion'; lineContent = line.substring(1);
+                    oldLineNumForThis = currentOldLineNum; displayOldLineNum = String(oldLineNumForThis);
+                    currentOldLineNum++;
+                } else if (line.startsWith(' ')) {
+                    lineClass = 'context'; lineContent = line.substring(1);
+                    oldLineNumForThis = currentOldLineNum; displayOldLineNum = String(oldLineNumForThis);
+                    newLineNumForThis = currentNewLineNum; displayNewLineNum = String(newLineNumForThis);
+                    currentOldLineNum++;
+                    currentNewLineNum++;
+                }else if (line.startsWith('~')) { 
+                    // Treat '~' like a context line for numbering and display
+                    lineClass = 'context'; // Use the same class as space
+                    lineContent = line.substring(1); // Get content after '~'
+                    oldLineNumForThis = currentOldLineNum; displayOldLineNum = String(oldLineNumForThis);
+                    newLineNumForThis = currentNewLineNum; displayNewLineNum = String(newLineNumForThis);
+                    // Increment BOTH counters, like a context line
+                    currentOldLineNum++;
+                    currentNewLineNum++;
+                }
+                else if (line.startsWith('\\')) {
+                    // Skip rendering the "no newline" marker
+                    continue;
+                } else {
+                     console.warn("Skipping unexpected line format:", JSON.stringify(line));
+                     continue; // Skip other lines (e.g., empty lines within hunk?)
+                }
+                // --- End Calculate ---
+   
+   
+               // --- Filtering Logic (EXACT RANGE ONLY V4) ---
+               let keepLine = false;
+               const targetStart = commentStartLine;
+               const targetEnd = commentEndLine;
+               // We already skipped header/no-newline lines
+               const checkLineNum = commentTargetsDeletion ? oldLineNumForThis : newLineNumForThis;
+   
+               // Keep ONLY if the relevant check number is within the EXACT target range
+               if (checkLineNum !== -1 && checkLineNum >= targetStart && checkLineNum <= targetEnd) {
+                   keepLine = true;
+               }
+                // --- End Filtering Logic ---
+    
+    
+                // // --- Logging (Keep for verification) ---
+                //  console.log(JSON.stringify({
+                //      line: line.substring(0, 40).padEnd(40),
+                //      type: lineClass,
+                //      oldNum: oldLineNumForThis,
+                //      newNum: newLineNumForThis,
+                //      target: `[${targetStart}-${targetEnd}]`,
+                //      isDelCtx: commentTargetsDeletion,
+                //      checkNum: checkLineNum,
+                //      keep: keepLine
+                //  }));
+                // // ---
+    
+                // --- Append to styledLinesHtml only if keepLine is true ---
+                if (keepLine) {
+                    const escapedLineContent = escapeHtml(lineContent);
+                    styledLinesHtml += `<span class="line ${lineClass}">` +
+                                           `<span class="line-num line-num-old" data-ln="${displayOldLineNum}">${displayOldLineNum}</span>` +
+                                           `<span class="line-num line-num-new" data-ln="${displayNewLineNum}">${displayNewLineNum}</span>` +
+                                           `<span class="line-content">${escapedLineContent}</span>` +
+                                       `</span>`; // No \n
+                }
+                // --- End Append ---
+    
+            } // End for loop rendering
+    
+            // --- Assign results to filteredHunkHtml ---
+            if (!parseError && styledLinesHtml) {
+                filteredHunkHtml = `<div class="diff-hunk"><pre><code>${styledLinesHtml}</code></pre></div>`;
+            } else if (parseError) {
+                 filteredHunkHtml = `<div class="diff-hunk error"><pre><code><span>Error processing diff context.</span></code></pre></div>`;
+            } else {
+                 console.log("No lines kept for diff hunk, comment:", comment.id, "Range:", commentStartLine, "-", commentEndLine);
+                 filteredHunkHtml = `<div class="diff-hunk empty"><pre><code>(Code context for lines ${commentStartLine}-${commentEndLine} not applicable or empty)</code></pre></div>`;
+            }
+            // --- End Assign Results ---
     
         } // End if(diffHunk...)
     
-        // Don't render the whole comment item if there's no body AND no filtered hunk
-        if (!commentBody && !filteredHunkHtml) return '';
-    
-        // Generate line range string
+        // --- Generate line range string for header ---
         let lineRangeString = '';
         if (commentStartLine !== null && commentEndLine !== null && commentStartLine !== commentEndLine) {
             lineRangeString = `<span class="line-range"> lines ${commentStartLine} to ${commentEndLine}</span>`;
         } else if (commentEndLine !== null) {
             lineRangeString = `<span class="line-range"> line ${commentEndLine}</span>`;
         }
+        // --- End Generate Line Range ---
     
-        // Return full comment HTML
-        return `<div class="timeline-item nested-review-comment-item" style="margin-left: 20px; margin-top: 10px; border-top: 1px dashed var(--vscode-editorWidget-border, #666); padding-top: 10px;">
-                    <div class="item-header" style="font-size: 0.95em;">
+        // --- Return full comment HTML ---
+        return `<div class="timeline-item nested-review-comment-item">
+                    <div class="item-header">
                          ${user ? `<img class="avatar" src="${user.avatar_url || ''}" alt="${escapeHtml(user?.login || 'unknown user')}" width="18" height="18">`: '<span class="avatar-placeholder" style="width:18px; height:18px;"></span>'}
                         <strong class="author">${escapeHtml(user?.login || 'unknown user')}</strong> commented on
-                        ${comment.path ? `<span class="file-path" style="font-size: 0.9em;">${escapeHtml(comment.path)}</span>` : ''}
+                        ${comment.path ? `<span class="file-path">${escapeHtml(comment.path)}</span>` : ''}
                         ${lineRangeString}
                         ${comment.html_url ? `<a class="gh-link" href="${comment.html_url}" title="View comment on GitHub" target="_blank">🔗</a>` : ''}
-                        <span class="timestamp" style="font-size: 0.9em;">${createdAt}</span>
+                        <span class="timestamp">${createdAt}</span>
                     </div>
                     ${filteredHunkHtml}
                     ${commentBody}
                 </div>`;
+        // --- End Return ---
     }
      
 

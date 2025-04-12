@@ -430,3 +430,52 @@ code { font-family: var(--vscode-editor-font-family); font-size: calc(var(--vsco
     margin: 0; /* Remove default paragraph margin */
     padding: 5px 0; /* Add some padding */
 }
+
+/* Diff Hunk styles adjustments */
+.diff-hunk .line {
+    display: flex;
+    white-space: pre; /* Use pre for whitespace handling */
+    margin: 0;
+    padding: 0;
+    font-family: var(--vscode-editor-font-family);
+    font-size: var(--vscode-editor-font-size);
+    line-height: var(--vscode-editor-line-height);
+}
+/* Style for BOTH line number columns */
+.diff-hunk .line-num {
+    flex: 0 0 45px; /* Fixed width, don't grow/shrink */
+    padding-right: 10px;
+    text-align: right;
+    opacity: 0.7;
+    user-select: none;
+    color: var(--vscode-editorLineNumber-foreground);
+    display: inline-block; /* Needed? */
+}
+/* Hide irrelevant line numbers */
+.diff-hunk .line.addition .line-num-old,
+.diff-hunk .line.deletion .line-num-new,
+.diff-hunk .line.hunk-header .line-num, /* Hide both for header */
+.diff-hunk .line.no-newline .line-num { /* Hide both for no-newline */
+    visibility: hidden;
+}
+/* Optional: Style context lines to only show new number */
+/* .diff-hunk .line.context .line-num-old {
+    visibility: hidden;
+} */
+
+/* Make header numbers dimmer */
+.diff-hunk .line.hunk-header .line-num-old,
+.diff-hunk .line.hunk-header .line-num-new {
+    opacity: 0.5;
+}
+
+.diff-hunk .line-content {
+    flex-grow: 1;
+    padding-left: 10px;
+    border-left: 3px solid transparent; /* Keep for consistency */
+    /* white-space: pre; handled by .line now */
+}
+.diff-hunk .line.addition .line-content { background-color: rgba(47, 131, 47, 0.15); border-left-color: var(--vscode-gitDecoration-addedResourceForeground); }
+.diff-hunk .line.deletion .line-content { background-color: rgba(188, 76, 0, 0.15); border-left-color: var(--vscode-gitDecoration-deletedResourceForeground); }
+.diff-hunk .line.hunk-header .line-content { color: var(--vscode-descriptionForeground); background-color: var(--vscode-textBlockQuote-background); padding: 2px 10px; font-style: italic; border-left: none; }
+.diff-hunk .line.no-newline .line-content { color: var(--vscode-descriptionForeground); background-color: var(--vscode-textBlockQuote-background); padding: 2px 10px; font-style: italic; border-left: none; opacity: 0.7;}
