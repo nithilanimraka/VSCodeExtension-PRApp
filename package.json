@@ -62,13 +62,14 @@
         {
           "command": "yourExtension.refreshPrView",
           "when": "view == yourPrViewId",
-          "group": "navigation"
+          "group": "navigation@0"
         },
         {
           "command": "yourExtension.showCreatePullRequestView",
           "when": "view == yourPrViewId",
           "group": "navigation@1"
         }
+        
       ],
       "view/item/context": []
     },

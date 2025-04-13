@@ -270,11 +270,11 @@ type FromWebviewMessage =
         const diffHunk = comment.diff_hunk;
         const commentEndLine = (typeof comment.line === 'number') ? comment.line : null;
         const commentStartLine = (typeof comment.start_line === 'number') ? comment.start_line : commentEndLine;
+        const isSingleLineComment = (commentStartLine === commentEndLine);
+        const PRECEDING_CONTEXT_LINES = 3; // Number of preceeding lines for single line comments
         
         if (diffHunk && commentEndLine !== null && commentStartLine !== null) {
             const lines = diffHunk.split('\n');
-            let styledLinesHtml = '';
-            let parseError = false;
     
             // --- Pre-analyze Hunk to Determine Comment Context (REVISED HEURISTIC V2) ---
             // This determines if the line numbers [start..end] refer to OLD (-) or NEW (+) file lines
@@ -320,13 +320,14 @@ type FromWebviewMessage =
     
             // --- Rendering Pass ---
             const linesToRender = diffHunk.split('\n');
-            console.log(`Rendering diff hunk for comment #${comment.id} with ${linesToRender.length} lines.`);
-            console.log(diffHunk);
+
             // Optional: Remove trailing empty line if present after split
             if (linesToRender.length > 0 && linesToRender[linesToRender.length - 1] === '') {
                 linesToRender.pop();
             }
     
+            let styledLinesHtml = '';
+            let parseError = false;
             let currentOldLineNum = -1;
             let currentNewLineNum = -1;
             let hunkHeaderParsed = false; 
@@ -404,25 +405,22 @@ type FromWebviewMessage =
                // We already skipped header/no-newline lines
                const checkLineNum = commentTargetsDeletion ? oldLineNumForThis : newLineNumForThis;
    
-               // Keep ONLY if the relevant check number is within the EXACT target range
-               if (checkLineNum !== -1 && checkLineNum >= targetStart && checkLineNum <= targetEnd) {
-                   keepLine = true;
-               }
-                // --- End Filtering Logic ---
-    
-    
-                // // --- Logging (Keep for verification) ---
-                //  console.log(JSON.stringify({
-                //      line: line.substring(0, 40).padEnd(40),
-                //      type: lineClass,
-                //      oldNum: oldLineNumForThis,
-                //      newNum: newLineNumForThis,
-                //      target: `[${targetStart}-${targetEnd}]`,
-                //      isDelCtx: commentTargetsDeletion,
-                //      checkNum: checkLineNum,
-                //      keep: keepLine
-                //  }));
-                // // ---
+                if (checkLineNum !== -1) { // Only filter if we have a valid line number
+                    if (isSingleLineComment) {
+                        // Single-line comment: Keep target line and PRECEDING_CONTEXT_LINES before it
+                        const displayStart = Math.max(1, targetEnd - PRECEDING_CONTEXT_LINES); // Lower bound is target - N (or 1)
+                        const displayEnd = targetEnd; // Upper bound is the target line itself
+
+                        if (checkLineNum >= displayStart && checkLineNum <= displayEnd) {
+                            keepLine = true;
+                        }
+                    } else {
+                        // Multi-line comment: Keep lines strictly within the target range [start..end]
+                        if (checkLineNum >= targetStart && checkLineNum <= targetEnd) {
+                            keepLine = true;
+                        }
+                    }
+                }
     
                 // --- Append to styledLinesHtml only if keepLine is true ---
                 if (keepLine) {
