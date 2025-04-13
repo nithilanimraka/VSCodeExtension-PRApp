@@ -37,22 +37,15 @@ type FromCreatePrWebviewMessage =
     | { command: 'compareBranches'; base: string; head: string }
     | { command: 'showCreatePrDiff'; data: { base: string; head: string; filename: string; status: ChangedFile['status']; owner: string; repo: string } };
 
-// Type for files returned by compareCommits API (subset needed)
-//type ComparisonFile = Endpoints["GET /repos/{owner}/{repo}/compare/{base}...{head}"]['response']['data']['files'][number];
 
-// Add this definition instead:
-// Manually define the expected structure for a file from the compareCommits API
 type ComparisonFile = {
     sha: string;
     filename: string;
     // Status from compareCommits API
     status: "added" | "removed" | "modified" | "renamed" | "copied" | "changed" | "unchanged";
-    // Add other fields if needed later (e.g., patch)
-    // patch?: string;
-    // previous_filename?: string;
 };
 
-// --- NEW: Helper function to safely get the Git API ---
+// Get the Git API 
 async function getGitApi() {
     try {
         const extension = vscode.extensions.getExtension('vscode.git');
@@ -81,7 +74,7 @@ async function getGitApi() {
 
 export class CreatePrViewProvider implements vscode.WebviewViewProvider {
 
-    public static readonly viewType = 'yourCreatePrViewId'; // Matches ID in package.json
+    public static readonly viewType = 'yourCreatePrViewId'; 
 
     private _view?: vscode.WebviewView;
     private _extensionContext: vscode.ExtensionContext;
@@ -114,21 +107,18 @@ export class CreatePrViewProvider implements vscode.WebviewViewProvider {
         // Set initial HTML (can be loading state or the form shell)
         webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
 
-        // --- ADD VISIBILITY CHANGE LISTENER ---
         this._visibilityChangeListener = webviewView.onDidChangeVisibility(() => {
             // Check if the view associated with THIS provider instance is now visible
             if (this._view?.visible) {
                 console.log('Create PR View became visible. Refreshing data...');
                 // Re-fetch and send data when the view becomes visible
-                // This ensures the form is populated even after collapse/expand
                 this.prepareAndSendData(); // Use prepareAndSendData to fetch potentially fresh data
             } else {
-                 console.log('Create PR View became hidden.'); // Log when hidden
+                 console.log('Create PR View became hidden.'); 
             }
         });
 
-        // --- Clean up listener when the view itself is disposed ---
-        // This is good practice, especially if the view can be closed/removed.
+        // Clean up listener when the view itself is disposed 
          const disposeListener = webviewView.onDidDispose(() => {
               console.log("Create PR View disposed, cleaning up visibility listener.");
               this._visibilityChangeListener?.dispose();
@@ -136,18 +126,12 @@ export class CreatePrViewProvider implements vscode.WebviewViewProvider {
               this._view = undefined; // Clear view reference
               disposeListener.dispose(); // Dispose this listener itself
          });
-         // If the provider itself might be disposed, ensure listeners are cleaned up there too.
 
         // Handle messages from the webview
         webviewView.webview.onDidReceiveMessage(async (data: FromCreatePrWebviewMessage) => {
             switch (data.command) {
                 case 'webviewReady': {
-                    // Webview is ready, if we have initial data, send it
                     console.log('Create PR webview is ready.');
-                    // Optional: If initial load sometimes fails, you *could* trigger
-                     // prepareAndSendData here, but it might be redundant with the
-                     // command and visibility triggers. Let's leave it out for now.
-                     // await this.prepareAndSendData();
                     break;
                 }
                 case 'getChangedFiles': {
@@ -163,16 +147,14 @@ export class CreatePrViewProvider implements vscode.WebviewViewProvider {
                     const diffData = data.data;
                     if (diffData && diffData.owner && diffData.repo && diffData.base && diffData.head && diffData.filename && diffData.status) {
                             console.log(`Provider received showCreatePrDiff request for: ${diffData.filename}`);
-                        // Call a new function to handle this specific diff request
-                        // Pass the context if needed by createTempFile
                         showDiffBetweenBranches(
-                            this._extensionContext, // Pass context
+                            this._extensionContext, 
                             diffData.owner,
                             diffData.repo,
                             diffData.base,
                             diffData.head,
                             diffData.filename,
-                            diffData.status // Pass status
+                            diffData.status 
                         );
                     } else {
                             console.error("Received incomplete data for showCreatePrDiff", diffData);
@@ -398,10 +380,9 @@ export class CreatePrViewProvider implements vscode.WebviewViewProvider {
                 head,
             });
 
-            // --- Add null/undefined check for response.data.files ---
+            // Check if the response contains the expected data
             if (response.status === 200 && response.data.files) {
-                // Map the response files (which should be ComparisonFile[]) to our simpler ChangedFile structure
-                return response.data.files.map((file: ComparisonFile) => ({ // Use the manual ComparisonFile type here
+                return response.data.files.map((file: ComparisonFile) => ({ 
                     path: file.filename,
                     status: this.mapComparisonStatus(file.status),
                 }));
@@ -409,36 +390,34 @@ export class CreatePrViewProvider implements vscode.WebviewViewProvider {
                     console.warn(`Compare branches response missing 'files' array or status not 200. Status: ${response.status}`);
                     // Handle cases like identical branches where 'files' might be empty or missing
                     if (response.data.status === 'identical') {
-                        return []; // No files changed
+                        return []; 
                     }
                     vscode.window.showWarningMessage(`Could not retrieve file changes for ${base}...${head}.`);
                     return [];
             }
         } catch (error: any) {
              console.error(`Error comparing branches ${base}...${head}:`, error);
-             // Provide more specific feedback if possible (e.g., 404 often means bad branch name)
              const message = error.status === 404
                  ? `Could not compare: One or both branches ('${base}', '${head}') not found.`
                  : `Error comparing branches: ${error.message || error}`;
              vscode.window.showErrorMessage(message);
-             return []; // Return empty list on error
+             return [];
         }
     }
 
-    // Helper to map GitHub's comparison status strings to our single chars
+    // Map GitHub's comparison status strings to our single chars
     private mapComparisonStatus(status?: string): ChangedFile['status'] {
         switch (status) {
             case 'added': return 'A';
             case 'removed': return 'D';
             case 'modified': return 'M';
             case 'renamed': return 'R';
-            case 'changed': return 'M'; // Treat 'changed' as 'modified'
-            // case 'copied': return 'C'; // compareCommits doesn't typically return 'copied'
+            case 'changed': return 'M'; 
             default: return '?';
         }
     }
 
-    // ---Method to fetch branches ---
+    // Method to fetch branches
     private async getRepoBranches(owner: string, repo: string): Promise<string[]> {
         const octokit = await getOctokit();
         if (!octokit) {
@@ -446,7 +425,6 @@ export class CreatePrViewProvider implements vscode.WebviewViewProvider {
             return [];
         }
         try {
-            // Use pagination to get all branches if there are more than 100
             const branches = await octokit.paginate(octokit.repos.listBranches, {
                 owner,
                 repo,
@@ -460,25 +438,22 @@ export class CreatePrViewProvider implements vscode.WebviewViewProvider {
         }
     }
 
-    // --- Git Interaction Logic (Use the helper function) ---
+    //  Git Interaction Logic 
     private async getCurrentGitInfo(): Promise<GitInfo> {
-        // --- Use the helper function ---
         const api = await getGitApi();
         if (!api) return {}; // Return empty if API not available
-        // --- End Use helper ---
 
         const repo = api.repositories[0]; // Use first repo
         const head = repo.state.HEAD;
         const headBranch = head?.name;
 
-        // Improved base branch logic - check remote tracking branch
+        // check remote tracking branch
         let baseBranch: string | undefined = undefined;
         if (head?.upstream?.remote && head?.upstream?.name) {
-             // If upstream is set, use it as base (common workflow)
+             // If upstream is set, use it as base 
              baseBranch = head.upstream.name;
         } else {
              // Fallback: check common names like main/master on origin
-             // This is still a guess and might need user input eventually
              const originMain = repo.state.refs.find((ref: any) => ref.type === 0 && ref.name === 'origin/main'); // Type=0 for head
              const originMaster = repo.state.refs.find((ref: any) => ref.type === 0 && ref.name === 'origin/master');
              if(originMain) baseBranch = 'main';
@@ -506,7 +481,7 @@ export class CreatePrViewProvider implements vscode.WebviewViewProvider {
             return { headBranch, baseBranch, owner, repo: repoName, remoteUrl, changedFiles: localChanges, branches: [] }; // Return empty branches list
         }
 
-        // --- Fetch branches and changed files ---
+        // Fetch branches and changed files 
         let branches: string[] = [];
         if (owner && repoName) {
             branches = await this.getRepoBranches(owner, repoName);
@@ -517,13 +492,11 @@ export class CreatePrViewProvider implements vscode.WebviewViewProvider {
              }
              if (headBranch && !branches.includes(headBranch)) {
                  console.warn(`Current head branch "${headBranch}" not found in remote branches? This might indicate local-only branch.`);
-                 // Decide how to handle this - maybe disable head selection or show warning
              }
         }
 
         const changedFiles = await this.getChangedFilesFromGit(repo); // Pass repo object
 
-        // ---  log to check file detection ---
         console.log(`Detected ${changedFiles.length} changed files in provider:`, changedFiles);
 
         return { headBranch, baseBranch, remoteUrl, owner, repo: repoName, changedFiles, branches };
@@ -550,31 +523,28 @@ export class CreatePrViewProvider implements vscode.WebviewViewProvider {
                 return; // Skip this iteration
             }
 
-            const filePath = change.resourceUri.fsPath; // Now safe to access
+            const filePath = change.resourceUri.fsPath; 
             let statusChar: ChangedFile['status'] = '?';
             const tooltip = change.decorations?.tooltip;
     
             if (typeof tooltip === 'string') {
-                // Infer status from tooltip text (adjust keywords based on actual tooltips you see)
+                // Infer status from tooltip text 
                 if (tooltip.includes('Modified')) statusChar = 'M';
-                else if (tooltip.includes('Untracked')) statusChar = 'A'; // Treat Untracked as Added for PR context
+                else if (tooltip.includes('Untracked')) statusChar = 'A'; 
                 else if (tooltip.includes('Added')) statusChar = 'A';
                 else if (tooltip.includes('Deleted')) statusChar = 'D';
                 else if (tooltip.includes('Renamed')) statusChar = 'R';
                 else if (tooltip.includes('Copied')) statusChar = 'C';
-                 // You might encounter others like 'Conflict', 'Ignored', 'Submodule'
                  else {
                      console.warn(`Unrecognized tooltip status for ${change.resourceUri.fsPath}: ${tooltip}`);
                      statusChar = '?'; // Fallback if tooltip text isn't recognized
                  }
             } else {
                 // Fallback if tooltip is missing or not a string.
-                // You could potentially inspect change.decorations.iconPath or other decorations here
-                // but for now, we'll mark it as unknown.
+                // This might happen if the decoration is not set up correctly or if file is untracked
                 console.warn(`Missing or invalid tooltip for ${change.resourceUri.fsPath}, unable to determine status reliably.`);
                 statusChar = '?';
             }
-            // --- End status determination based on decorations ---
     
             // Use change.resourceUri.fsPath for the unique key and path
             uniqueChanges.set(change.resourceUri.fsPath, { path: filePath, status: statusChar });
@@ -584,7 +554,7 @@ export class CreatePrViewProvider implements vscode.WebviewViewProvider {
     }
 
 
-    // --- HTML Generation ---
+    // HTML Generation 
     private _getHtmlForWebview(webview: vscode.Webview): string {
         const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionContext.extensionUri, 'dist', 'webview', 'createPrMain.js'));
         const stylesUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionContext.extensionUri, 'dist', 'webview', 'createPrStyles.css'));

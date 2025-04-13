@@ -1,9 +1,5 @@
-/* --- START INLINE JAVASCRIPT --- */
 import MarkdownIt from 'markdown-it';
 
-// Define necessary types directly or import from a shared types file
-// These might need adjustment based on exactly what properties you use
-// Ideally, import from a shared types definition file (e.g., ../types)
 interface VsCodeApi {
     postMessage(message: any): void;
     getState(): any;
@@ -11,14 +7,14 @@ interface VsCodeApi {
 }
 declare const acquireVsCodeApi: () => VsCodeApi;
 
-// Define basic structures for data received via postMessage
-// Import the full types if shared properly
+
+// Basic structures for data received via postMessage
 type ReviewComment = { body?: string | null; body_html?: string | null; diff_hunk?: string | null; id: number; user?: { login?: string | null, avatar_url?: string | null } | null; created_at: string; path?: string | null; html_url?: string | null; line?: number | null; start_line?: number | null; pull_request_review_id?: number | null };
 type Review = { id: number; state?: string | null; user?: { login?: string | null, avatar_url?: string | null } | null; submitted_at?: string | null; body?: string | null; body_html?: string | null; html_url?: string | null; associated_comments?: ReviewComment[] | null };
 type IssueComment = { body?: string | null; body_html?: string | null; id: number; user?: { login?: string | null, avatar_url?: string | null } | null; created_at: string; html_url?: string | null; };
 type CommitListItem = { sha: string; commit: { author?: { name?: string | null, date?: string | null } | null, committer?: { date?: string | null } | null, message: string }; author?: { login?: string | null, avatar_url?: string | null } | null; html_url?: string | null };
 
-interface TimelineItemBase { timestamp: Date; } // Keep Date type if possible
+interface TimelineItemBase { timestamp: Date; } 
 interface ReviewTimelineItem extends TimelineItemBase { type: 'review'; data: Review }
 interface ReviewCommentTimelineItem extends TimelineItemBase { type: 'review_comment'; data: ReviewComment }
 interface IssueCommentTimelineItem extends TimelineItemBase { type: 'issue_comment'; data: IssueComment }
@@ -30,39 +26,26 @@ interface PrDetails {
     timeline: TimelineItem[];
     mergeable_state: string;
     mergeable: boolean | null;
-    // Add fields for the header display
     state: 'open' | 'closed';
     merged: boolean;
     authorLogin: string;
     authorAvatarUrl?: string | null;
     baseLabel: string;
     headLabel: string;
-    body: string | null; // body
-    createdAt: string; // creation date
+    body: string | null; 
+    createdAt: string; 
 }
 
-// Type for the specific merge status update
 type MergeStatusUpdateData = {
     mergeable: boolean | null;
     mergeable_state: string;
 };
 
-// Message type from extension
 type FromExtensionMessage =
     | { command: 'loadDetails'; data: PrDetails }
-    | { command: 'updateTimeline'; timeline: TimelineItem[] } // Keep if polling only sends timeline
+    | { command: 'updateTimeline'; timeline: TimelineItem[] } // If polling only sends timeline
     | { command: 'updateMergeStatus'; data: MergeStatusUpdateData }
     | { command: 'showError'; message: string };
-
-// Messages sent FROM webview TO extension
-type FromWebviewMessage =
-    | { command: 'webviewReady' }
-    | { command: 'showError'; text: string }
-    // Add merge_method to mergePr data payload
-    | { command: 'mergePr'; data: { merge_method: 'merge' | 'squash' | 'rebase' } }
-    | { command: 'addComment'; text: string }
-    | { command: 'closePr' }
-    | { command: 'refreshThisPr' };
 
 
 (function() {
@@ -83,18 +66,15 @@ type FromWebviewMessage =
     const closeButton = document.getElementById('close-button') as HTMLButtonElement | null;
     const refreshButton = document.getElementById('refresh-button') as HTMLButtonElement | null;
 
-    // --- Instantiate Markdown-It ---
-    // Ensure markdownit is loaded (check browser console if errors occur)
-    // --- Instantiate Markdown-It ---
+    // Instantiate Markdown-It
     const md = MarkdownIt({
-        html: false, // Keep false for security
+        html: false, 
         linkify: true,
         typographer: true,
         breaks: true
     });
-    // --- End Instantiate ---
 
-    // --- Helper Functions ---
+    // Helper Functions 
 
     function renderMetadataHeader(prData: PrDetails) {
         if (!metadataHeaderDiv) return;
@@ -121,7 +101,7 @@ type FromWebviewMessage =
 
         const authorAvatarHtml = prData.authorAvatarUrl
             ? `<img class="avatar author-avatar" src="${escapeHtml(prData.authorAvatarUrl)}" alt="${escapeHtml(prData.authorLogin)}" width="20" height="20">`
-            : '<span class="avatar-placeholder" style="width:20px; height:20px;"></span>'; // Placeholder if no avatar
+            : '<span class="avatar-placeholder" style="width:20px; height:20px;"></span>'; 
 
         // Construct the description string
         const descriptionHtml = `
@@ -144,7 +124,7 @@ type FromWebviewMessage =
     function renderMergeStatus(mergeable: boolean | null, state: string) {
         if (!mergeStatusDiv) return;
         mergeStatusDiv.classList.remove('loading');
-        mergeStatusDiv.innerHTML = ''; // Clear loading
+        mergeStatusDiv.innerHTML = ''; 
 
         let iconClass = 'codicon-question';
         let text = `Merge status: ${state}`;
@@ -163,7 +143,7 @@ type FromWebviewMessage =
              text = 'Merging is blocked (e.g., required reviews missing).';
              statusClass = 'merge-blocked';
         } else if (state === 'unstable' || state === 'behind') {
-            iconClass = 'codicon-issues'; // Or warning?
+            iconClass = 'codicon-issues'; 
             text = `Merging may be possible, but the branch is ${state}. Consider updating.`;
             statusClass = 'merge-unstable';
         } else {
@@ -178,14 +158,10 @@ type FromWebviewMessage =
             const canMerge = mergeable === true && ['clean', 'behind', 'unstable'].includes(state);
             confirmMergeButton.disabled = !canMerge;
             confirmMergeButton.title = canMerge ? 'Confirm merging this pull request' : `Cannot merge (State: ${state}, Mergeable: ${mergeable})`;
-            // Optional: Change button text based on disabled state?
-            // confirmMergeButton.innerHTML = canMerge
-            //     ? `<span class="codicon codicon-git-merge"></span> Confirm Merge`
-            //     : `<span class="codicon codicon-git-merge"></span> Cannot Merge`;
         }
     }
 
-    // --- Render Function for PR Description ---
+    // Render Function for PR Description 
     function renderPrDescription(prData: PrDetails) {
         if (!descriptionAreaDiv) return;
 
@@ -197,7 +173,7 @@ type FromWebviewMessage =
             : '<span class="avatar-placeholder" style="width:20px; height:20px;"></span>';
 
         const headerHtml = `
-            <div class="comment-header"> ${/* Reuse comment header style? */''}
+            <div class="comment-header"> 
                 ${authorAvatarHtml}
                 <strong class="author">${escapeHtml(prData.authorLogin)}</strong> commented on ${formattedDate}
             </div>
@@ -247,7 +223,6 @@ type FromWebviewMessage =
         if (comment.body_html && comment.body_html.trim() !== '') {
             commentBodyContent = comment.body_html;
         } else if (comment.body && comment.body.trim() !== '') {
-            //console.log(`Rendering comment.body with markdown-it for comment #${comment.id}`);
             try {
                 commentBodyContent = md.render(comment.body);
             } catch (e) {
@@ -258,27 +233,22 @@ type FromWebviewMessage =
         return commentBodyContent ? `<div class="comment-body">${commentBodyContent}</div>` : '';
     }
 
-    // --- NEW: Helper to generate HTML for a single review comment (used for nesting) ---
-    // Simplified version of generateReviewCommentHtml, focusing on the comment itself
-    
-    // src/webview/main.ts
-
     function generateNestedReviewCommentHtml(comment: ReviewComment): string {
         const user = comment.user;
         const createdAt = comment.created_at ? new Date(comment.created_at).toLocaleString() : '';
-        const commentBody = generateCommentBodyHtml(comment); // Uses helper defined elsewhere
+        const commentBody = generateCommentBodyHtml(comment); 
     
         let filteredHunkHtml = '';
         const diffHunk = comment.diff_hunk;
         const commentEndLine = (typeof comment.line === 'number') ? comment.line : null;
         const commentStartLine = (typeof comment.start_line === 'number') ? comment.start_line : commentEndLine;
         const isSingleLineComment = (commentStartLine === commentEndLine);
-        const PRECEDING_CONTEXT_LINES = 3; // Number of preceeding lines for single line comments
+        const PRECEDING_CONTEXT_LINES = 3; 
         
         if (diffHunk && commentEndLine !== null && commentStartLine !== null) {
             const lines = diffHunk.split('\n');
     
-            // --- Pre-analyze Hunk to Determine Comment Context (REVISED HEURISTIC V2) ---
+  
             // This determines if the line numbers [start..end] refer to OLD (-) or NEW (+) file lines
             let commentTargetsDeletion = false;
             try {
@@ -318,12 +288,9 @@ type FromWebviewMessage =
                 console.error("Error during hunk pre-analysis V2:", e);
                 commentTargetsDeletion = false;
             }
-            // --- End Pre-analysis V2 ---
     
-            // --- Rendering Pass ---
             const linesToRender = diffHunk.split('\n');
 
-            // Optional: Remove trailing empty line if present after split
             if (linesToRender.length > 0 && linesToRender[linesToRender.length - 1] === '') {
                 linesToRender.pop();
             }
@@ -343,7 +310,7 @@ type FromWebviewMessage =
                 let lineContent = '';
                 let oldLineNumForThis = -1;
                 let newLineNumForThis = -1;
-                let isHunkHeader = false; // Flag for this specific line
+                let isHunkHeader = false; 
    
                 if (line.startsWith('@@')) {
                     isHunkHeader = true;
@@ -352,7 +319,7 @@ type FromWebviewMessage =
                         // Initialize counters based on the STARTING line numbers from the header
                         currentOldLineNum = parseInt(match[1], 10);
                         currentNewLineNum = parseInt(match[3], 10);
-                        hunkHeaderParsed = true; // Mark that we've processed the header
+                        hunkHeaderParsed = true; 
                         console.log(`Hunk Header Parsed: Old Start=${currentOldLineNum}, New Start=${currentNewLineNum}`);
                     } else {
                         parseError = true; console.error(`Error parsing hunk header: ${escapeHtml(line)}`);
@@ -364,7 +331,7 @@ type FromWebviewMessage =
                 // Only process lines AFTER a header has been successfully parsed
                 if (!hunkHeaderParsed) continue;
    
-                // --- Calculate line numbers and classes for CONTENT lines ---
+                // Calculate line numbers and classes for CONTENT lines 
                 if (line.startsWith('+')) {
                     lineClass = 'addition'; lineContent = line.substring(1);
                     // Assign the CURRENT counter value, THEN increment for the NEXT line
@@ -381,12 +348,10 @@ type FromWebviewMessage =
                     currentOldLineNum++;
                     currentNewLineNum++;
                 }else if (line.startsWith('~')) { 
-                    // Treat '~' like a context line for numbering and display
-                    lineClass = 'context'; // Use the same class as space
-                    lineContent = line.substring(1); // Get content after '~'
+                    lineClass = 'context'; 
+                    lineContent = line.substring(1); 
                     oldLineNumForThis = currentOldLineNum; displayOldLineNum = String(oldLineNumForThis);
                     newLineNumForThis = currentNewLineNum; displayNewLineNum = String(newLineNumForThis);
-                    // Increment BOTH counters, like a context line
                     currentOldLineNum++;
                     currentNewLineNum++;
                 }
@@ -395,16 +360,15 @@ type FromWebviewMessage =
                     continue;
                 } else {
                      console.warn("Skipping unexpected line format:", JSON.stringify(line));
-                     continue; // Skip other lines (e.g., empty lines within hunk?)
+                     continue; 
                 }
                 // --- End Calculate ---
    
    
-               // --- Filtering Logic (EXACT RANGE ONLY V4) ---
+               // Filtering Logic 
                let keepLine = false;
                const targetStart = commentStartLine;
                const targetEnd = commentEndLine;
-               // We already skipped header/no-newline lines
                const checkLineNum = commentTargetsDeletion ? oldLineNumForThis : newLineNumForThis;
    
                 if (checkLineNum !== -1) { // Only filter if we have a valid line number
@@ -424,7 +388,7 @@ type FromWebviewMessage =
                     }
                 }
     
-                // --- Append to styledLinesHtml only if keepLine is true ---
+                // Append to styledLinesHtml only if keepLine is true
                 if (keepLine) {
                     const escapedLineContent = escapeHtml(lineContent);
                     styledLinesHtml += `<span class="line ${lineClass}">` +
@@ -433,11 +397,10 @@ type FromWebviewMessage =
                                            `<span class="line-content">${escapedLineContent}</span>` +
                                        `</span>`; // No \n
                 }
-                // --- End Append ---
     
-            } // End for loop rendering
+            } 
     
-            // --- Assign results to filteredHunkHtml ---
+            // Assign results to filteredHunkHtml 
             if (!parseError && styledLinesHtml) {
                 filteredHunkHtml = `<div class="diff-hunk"><pre><code>${styledLinesHtml}</code></pre></div>`;
             } else if (parseError) {
@@ -446,20 +409,18 @@ type FromWebviewMessage =
                  console.log("No lines kept for diff hunk, comment:", comment.id, "Range:", commentStartLine, "-", commentEndLine);
                  filteredHunkHtml = `<div class="diff-hunk empty"><pre><code>(Code context for lines ${commentStartLine}-${commentEndLine} not applicable or empty)</code></pre></div>`;
             }
-            // --- End Assign Results ---
     
-        } // End if(diffHunk...)
+        } 
     
-        // --- Generate line range string for header ---
+        //  Generate line range string for header 
         let lineRangeString = '';
         if (commentStartLine !== null && commentEndLine !== null && commentStartLine !== commentEndLine) {
             lineRangeString = `<span class="line-range"> lines ${commentStartLine} to ${commentEndLine}</span>`;
         } else if (commentEndLine !== null) {
             lineRangeString = `<span class="line-range"> line ${commentEndLine}</span>`;
         }
-        // --- End Generate Line Range ---
     
-        // --- Return full comment HTML ---
+        // Return full comment HTML 
         return `<div class="timeline-item nested-review-comment-item">
                     <div class="item-header">
                          ${user ? `<img class="avatar" src="${user.avatar_url || ''}" alt="${escapeHtml(user?.login || 'unknown user')}" width="18" height="18">`: '<span class="avatar-placeholder" style="width:18px; height:18px;"></span>'}
@@ -472,11 +433,9 @@ type FromWebviewMessage =
                     ${filteredHunkHtml}
                     ${commentBody}
                 </div>`;
-        // --- End Return ---
     }
      
 
-    // --- HTML Generation Functions (REVISED with null checks and correct body_html usage) ---
     function generateReviewHtml(review: Review): string {
         const associatedComments = review.associated_comments || [];
         const stateFormatted = formatReviewState(review.state);
@@ -487,7 +446,7 @@ type FromWebviewMessage =
         const hasMeaningfulState = review.state && review.state !== 'COMMENTED';
 
         if (!reviewBody && !hasMeaningfulState && associatedComments.length === 0) {
-             //console.log(`Skipping review submission #${review.id} as it's empty and has no comments.`);
+            // No meaningful content to display
              return '';
         }
 
@@ -518,10 +477,6 @@ type FromWebviewMessage =
 
          if (!commentBody && !diffHunkHtml) return '';
 
-                        // Correction: generateReviewCommentHtml shouldn't call generateNestedReviewCommentHtml
-                        // It should probably just display its own content without the nested styling/filtering
-                        // Or, ideally, it shouldn't be called if filtering in extension.ts is correct.
-                        // Let's simplify it for now to just show body:
         return `<div class="timeline-item review-comment-item">
                     <div class="item-header">
                         ${user ? `<img class="avatar" src="${user.avatar_url || ''}" alt="${escapeHtml(user?.login || 'unknown user')}" width="20" height="20">`: '<span class="avatar-placeholder"></span>'}
@@ -562,7 +517,6 @@ type FromWebviewMessage =
         const avatarUrl = userAuthor?.avatar_url || ''; // Use associated GH user avatar if available
         // Prefer GH user login, fallback to commit author name
         const authorName = escapeHtml(userAuthor?.login || authorInfo?.name || 'unknown');
-        // Use commit author date, fallback to committer date might be less accurate for PR view
         const commitDate = authorInfo?.date ? new Date(authorInfo.date).toLocaleDateString() : '';
         // Get the first line of the commit message for the title
         const commitTitle = escapeHtml(commitData.commit.message.split('\n')[0]); // Double BS for JS split
@@ -590,7 +544,7 @@ type FromWebviewMessage =
    }
 
 
-    // --- Main Rendering Function ---
+    //  Rendering Function 
     function renderTimeline(timelineData: TimelineItem[]) {
         if (!timelineContainer) { console.error("Timeline container not found!"); return; }
         timelineContainer.innerHTML = ''; // Clear previous content ('Loading...' indicator)
@@ -600,15 +554,14 @@ type FromWebviewMessage =
             return;
         }
 
-         //console.log(`Rendering ${timelineData.length} timeline items...`);
          const fragment = document.createDocumentFragment();
-        timelineData.forEach((item: TimelineItem, index: number) => { // Add types here
+        timelineData.forEach((item: TimelineItem, index: number) => { 
             let elementHtml = '';
             try {
                 // Pass the correctly typed data object
                 switch (item.type) {
                     case 'review': elementHtml = generateReviewHtml(item.data); break;
-                    case 'review_comment': elementHtml = generateReviewCommentHtml(item.data); break; // Should rarely be hit if filter works
+                    case 'review_comment': elementHtml = generateReviewCommentHtml(item.data); break; // Should rarely happen if filter works
                     case 'issue_comment': elementHtml = generateIssueCommentHtml(item.data); break;
                     case 'commit': elementHtml = generateCommitHtml(item.data); break;
                     default: console.warn("Unknown timeline item type:", (<any>item).type); // Use any type assertion for safety
@@ -632,11 +585,10 @@ type FromWebviewMessage =
             }
         });
         timelineContainer.appendChild(fragment);
-         // No longer need parseAndStyleDiffHunks here
          console.log("Timeline rendering complete.");
     }
 
-    // --- Message Listener ---
+    // Message Listener 
     window.addEventListener('message', (event: MessageEvent<FromExtensionMessage>) => {
         const message = event.data;
         switch (message.command) {
@@ -651,12 +603,10 @@ type FromWebviewMessage =
                 renderMetadataHeader(message.data);
                 renderMergeStatus(message.data.mergeable, message.data.mergeable_state);
                 renderPrDescription(message.data);
-                // TODO: Enable/disable merge button based on mergeable/state
                 break;
 
             case 'updateMergeStatus':
                 console.log('Received merge status update:', message.data);
-                // Call only the function needed to update the merge section
                 renderMergeStatus(message.data.mergeable, message.data.mergeable_state);
                 break;
 
@@ -686,13 +636,13 @@ type FromWebviewMessage =
     });
 
     // Merge Button
-    confirmMergeButton?.addEventListener('click', () => { // Use new button ID
-        if (confirmMergeButton.disabled || !mergeMethodSelect) return; // Also check select exists
+    confirmMergeButton?.addEventListener('click', () => { 
+        if (confirmMergeButton.disabled || !mergeMethodSelect) return; 
 
         const selectedMethod = mergeMethodSelect.value as 'merge' | 'squash' | 'rebase'; // Get selected method
 
         if (!selectedMethod) {
-             console.error("No merge method selected"); // Should have a default
+             console.error("No merge method selected"); 
              return;
         }
 
@@ -715,8 +665,6 @@ type FromWebviewMessage =
 
         vscode.postMessage({ command: 'addComment', text: commentText });
 
-        // Clear textarea and re-enable button after a short delay (or wait for confirmation?)
-        // For now, just clear and re-enable optimistically after sending
         setTimeout(() => {
              if (commentTextArea) {
                   commentTextArea.value = '';
@@ -726,7 +674,7 @@ type FromWebviewMessage =
                  addCommentButton.disabled = false;
                  addCommentButton.innerHTML = `<span class="codicon codicon-comment"></span> Comment`;
              }
-        }, 1000); // Adjust delay as needed
+        }, 1000); 
     });
 
     // Close Button
@@ -742,4 +690,4 @@ type FromWebviewMessage =
     vscode.postMessage({ command: 'webviewReady' });
     console.log("Webview script initialized and ready.");
 
-}()); // End IIFE
+}());
