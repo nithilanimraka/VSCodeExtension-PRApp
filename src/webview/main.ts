@@ -61,7 +61,8 @@ type FromWebviewMessage =
     // Add merge_method to mergePr data payload
     | { command: 'mergePr'; data: { merge_method: 'merge' | 'squash' | 'rebase' } }
     | { command: 'addComment'; text: string }
-    | { command: 'closePr' };
+    | { command: 'closePr' }
+    | { command: 'refreshThisPr' };
 
 
 (function() {
@@ -80,6 +81,7 @@ type FromWebviewMessage =
     const commentTextArea = document.getElementById('new-comment-text') as HTMLTextAreaElement | null;
     const addCommentButton = document.getElementById('add-comment-button') as HTMLButtonElement | null;
     const closeButton = document.getElementById('close-button') as HTMLButtonElement | null;
+    const refreshButton = document.getElementById('refresh-button') as HTMLButtonElement | null;
 
     // --- Instantiate Markdown-It ---
     // Ensure markdownit is loaded (check browser console if errors occur)
@@ -639,13 +641,17 @@ type FromWebviewMessage =
         const message = event.data;
         switch (message.command) {
             case 'loadDetails':
-                 console.log('Received full PR details:', message.data);
-                 if (timelineContainer) timelineContainer.innerHTML = ''; // Clear loading indicator
-                    renderTimeline(message.data.timeline || []);
-                    renderMetadataHeader(message.data);
-                    renderMergeStatus(message.data.mergeable, message.data.mergeable_state);
-                    renderPrDescription(message.data);
-                    // TODO: Enable/disable merge button based on mergeable/state
+                console.log('Received full PR details:', message.data);
+                if (refreshButton) {
+                    refreshButton.disabled = false;
+                    refreshButton.classList.remove('loading');
+                }
+                if (timelineContainer) timelineContainer.innerHTML = ''; // Clear loading indicator
+                renderTimeline(message.data.timeline || []);
+                renderMetadataHeader(message.data);
+                renderMergeStatus(message.data.mergeable, message.data.mergeable_state);
+                renderPrDescription(message.data);
+                // TODO: Enable/disable merge button based on mergeable/state
                 break;
 
             case 'updateMergeStatus':
@@ -663,6 +669,19 @@ type FromWebviewMessage =
                     timelineContainer.innerHTML = `<p style="color: var(--vscode-errorForeground);">${escapeHtml(message.message)}</p>`;
                 }
                 break;
+        }
+    });
+
+    // Refresh Button Listener 
+    refreshButton?.addEventListener('click', () => {
+        console.log("Refresh button clicked.");
+        if (refreshButton && !refreshButton.disabled) {
+             // Disable button and show loading state
+             refreshButton.disabled = true;
+             refreshButton.classList.add('loading');
+
+             // Tell extension host to refresh data for this PR
+             vscode.postMessage({ command: 'refreshThisPr' });
         }
     });
 

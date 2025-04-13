@@ -24,7 +24,8 @@ type FromWebviewMessage =
     | { command: 'alert'; text: string }
     | { command: 'mergePr'; data: { merge_method: 'merge' | 'squash' | 'rebase' } }
     | { command: 'addComment'; text: string }
-    | { command: 'closePr' };
+    | { command: 'closePr' }
+    | { command: 'refreshThisPr' };
 
 type MergeStatusUpdateData = {
     mergeable: boolean | null;
@@ -237,24 +238,33 @@ async function createOrShowPrDetailWebview(context: vscode.ExtensionContext, prI
     panel.webview.onDidReceiveMessage(
         async (message: FromWebviewMessage) => { // Add type annotation
             const octokit = await getOctokit();
-            if (!octokit) {
-                vscode.window.showErrorMessage("Cannot perform action: GitHub authentication required.");
-                return;
-            }
             const owner = prInfo.repoOwner;
             const repo = prInfo.repoName;
             const pull_number = prInfo.number;
 
             switch (message.command) {
+                case 'refreshThisPr':
+                     console.log(`Received refresh request for PR #${pull_number}`);
+                     // Call the existing function to refetch and update content
+                     // Pass the specific panel's webview reference
+                     await updateWebviewContent(context, panel.webview, prInfo);
+                     // 'loadDetails' sent by updateWebviewContent will reset button state
+                     return;
+
                 case 'alert':
                     vscode.window.showErrorMessage(message.text);
                     return;
+
                  case 'webviewReady':
                      console.log(`PR Detail Webview for #${prInfo.number} is ready.`);
                      // Optional: Send data again if initial load failed? Usually handled by updateWebviewContent
                      return;
 
                  case 'mergePr':
+                    if (!octokit) {
+                        vscode.window.showErrorMessage("Cannot perform action: GitHub authentication required.");
+                        return;
+                    }
                     const mergeMethod = message.data?.merge_method || 'merge';
                     try {
                         vscode.window.showInformationMessage(`Attempting to merge PR #${pull_number} using '${mergeMethod}' method...`);
@@ -283,6 +293,10 @@ async function createOrShowPrDetailWebview(context: vscode.ExtensionContext, prI
                     return; // End mergePr
 
                  case 'addComment':
+                    if (!octokit) {
+                        vscode.window.showErrorMessage("Cannot perform action: GitHub authentication required.");
+                        return;
+                    }
                      try {
                          await octokit.issues.createComment({
                              owner,
@@ -301,6 +315,10 @@ async function createOrShowPrDetailWebview(context: vscode.ExtensionContext, prI
                      return; // End addComment
 
                  case 'closePr':
+                    if (!octokit) {
+                        vscode.window.showErrorMessage("Cannot perform action: GitHub authentication required.");
+                        return;
+                    }
                      try {
                           vscode.window.showInformationMessage(`Attempting to close PR #${pull_number}...`);
                           await octokit.pulls.update({
@@ -651,7 +669,12 @@ async function getWebviewTimelineHtml(
         </style>
     </head>
     <body>
-        <h1><a href="${prInfo.url}" target="_blank">#${prInfo.number}: ${escapeHtml(prInfo.title)}</a></h1>
+        <div class="title-bar">
+            <h1><a href="${prInfo.url}" target="_blank">#${prInfo.number}: ${escapeHtml(prInfo.title)}</a></h1>
+            <button id="refresh-button" class="button icon-button" title="Refresh PR Details">
+                    <span class="codicon codicon-refresh"></span>
+            </button>
+        </div>
         
         <div id="pr-metadata-header" class="pr-metadata-header">
              Loading details...

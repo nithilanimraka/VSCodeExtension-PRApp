@@ -479,3 +479,67 @@ code { font-family: var(--vscode-editor-font-family); font-size: calc(var(--vsco
 .diff-hunk .line.deletion .line-content { background-color: rgba(188, 76, 0, 0.15); border-left-color: var(--vscode-gitDecoration-deletedResourceForeground); }
 .diff-hunk .line.hunk-header .line-content { color: var(--vscode-descriptionForeground); background-color: var(--vscode-textBlockQuote-background); padding: 2px 10px; font-style: italic; border-left: none; }
 .diff-hunk .line.no-newline .line-content { color: var(--vscode-descriptionForeground); background-color: var(--vscode-textBlockQuote-background); padding: 2px 10px; font-style: italic; border-left: none; opacity: 0.7;}
+
+/* Styles for Title Bar */
+.title-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 15px;
+    margin-bottom: 10px;
+    padding-bottom: 8px; /* Optional: Space above separator */
+}
+
+.title-bar h1 {
+    margin-bottom: 0;
+    flex-grow: 1;
+    min-width: 0;
+    font-size: 2em; /* Adjust size as needed */
+}
+
+.title-bar h1 a {
+    color: inherit; /* Use default heading color */
+    text-decoration: none;
+}
+.title-bar h1 a:hover {
+     text-decoration: underline;
+}
+
+
+/* Style for icon-only button in title */
+.title-bar .icon-button {
+    padding: 4px 6px;
+    min-width: auto;
+    line-height: 1;
+    flex-shrink: 0; /* Prevent button from shrinking */
+    /* Make it subtle or primary? Using default button style for now */
+    /* background-color: var(--vscode-button-background); */
+    /* color: var(--vscode-button-foreground); */
+}
+
+/* Loading state for refresh button */
+#refresh-button.loading .codicon-refresh {
+    display: none;
+}
+#refresh-button.loading::before {
+    /* Show sync icon using pseudo-element */
+    font-family: 'codicon'; /* Make sure codicon font is loaded */
+    content: "\\ea77"; /* Unicode for codicon-sync */
+    display: inline-block;
+    /* margin-right: 4px; */ /* No space needed for icon only */
+    vertical-align: text-bottom;
+    /* Add spin animation */
+    animation: codicon-spin 1.5s infinite linear;
+}
+#refresh-button.loading {
+    cursor: progress; /* Indicate loading */
+    opacity: 0.7;
+}
+
+/* Re-use codicon spin animation if not already globally defined */
+/* Ensure this animation is defined somewhere in your CSS */
+@keyframes codicon-spin {
+	100% {
+		transform: rotate(360deg);
+	}
+}
