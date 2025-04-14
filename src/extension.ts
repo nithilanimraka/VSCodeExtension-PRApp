@@ -1,11 +1,9 @@
 import * as vscode from 'vscode';
-import { getGitHubSession, getOctokit } from './auth';
+import { getGitHubSession } from './auth';
 import { PrDataProvider, PullRequestItem } from './prDataProvider';
-import { Octokit } from '@octokit/rest'; 
 import type { Endpoints } from "@octokit/types"; 
 import type { PullRequestInfo } from './prDataProvider';
 import { CreatePrViewProvider } from './createPrViewProvider'; 
-import { getNonce, escapeHtml } from './utils'; 
 
 import * as PrDescription from './prDescriptionProvider'; 
 
