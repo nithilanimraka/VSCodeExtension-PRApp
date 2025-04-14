@@ -1,35 +1,4 @@
-// Define types matching the ones in createPrViewProvider.ts
-interface GitInfo {
-    headBranch?: string;
-    baseBranch?: string;
-    remoteUrl?: string;
-    owner?: string;
-    repo?: string;
-    changedFiles?: ChangedFile[];
-    branches?: string[];
-}
-interface ChangedFile {
-    path: string;
-    status: 'A' | 'M' | 'D' | 'R' | 'C' | '?';
-}
-type ToCreatePrWebviewMessage =
-    | { command: 'loadFormData'; data: GitInfo };
-
-type FromCreatePrWebviewMessage =
-    | { command: 'webviewReady' }
-    | { command: 'createPrRequest'; data: { base: string; head: string; title: string; body: string; } }
-    | { command: 'cancelPr' }
-    | { command: 'getChangedFiles' }
-    | { command: 'showError'; text: string }
-    | { command: 'compareBranches'; base: string; head: string }
-    | { command: 'showCreatePrDiff'; data: { base: string; head: string; filename: string; status: ChangedFile['status']; owner: string; repo: string } };
-
-
-interface VsCodeApi {
-    postMessage(message: FromCreatePrWebviewMessage): void;
-    getState(): any;
-    setState(state: any): void;
-}
+import { ChangedFile, ToCreatePrWebviewMessage, VsCodeApi } from '../types'; 
 
 let currentOwner: string | undefined;
 let currentRepo: string | undefined;
@@ -51,10 +20,10 @@ declare const acquireVsCodeApi: () => VsCodeApi;
 
     const formElement = document.querySelector('.create-pr-form') as HTMLElement | null; // Get form container
 
-    // --- Store the branches list locally ---
+    // Store the branches list locally 
     let availableBranches: string[] | undefined = undefined;
 
-    // --- Event Listeners ---
+    // Event Listeners
 
     // Listen for messages from the extension host
     window.addEventListener('message', (event: MessageEvent<ToCreatePrWebviewMessage>) => {
@@ -70,7 +39,7 @@ declare const acquireVsCodeApi: () => VsCodeApi;
                 console.log(`Stored owner: ${currentOwner}, repo: ${currentRepo}`);
             }
 
-            // --- ALWAYS Ensure form is visible when data arrives ---
+            // ALWAYS Ensure form is visible when data arrives 
            showWaitingState(false);
 
            // Clear Title and Description before applying new data (handles reset case too)
@@ -158,7 +127,7 @@ declare const acquireVsCodeApi: () => VsCodeApi;
         }
     }
 
-    // --- Listener for branch changes ---
+    // Listener for branch changes 
     let compareTimeout: number | undefined;
     function handleBranchChange() {
         // Clear previous timeout if exists (debounce)
@@ -192,7 +161,7 @@ declare const acquireVsCodeApi: () => VsCodeApi;
     // Handle Create button click 
     createButton?.addEventListener('click', (e) => {
         e.preventDefault();
-        // --- Get values from select elements ---
+        //Get values from select elements 
         const base = baseBranchSelect.value;
         const head = headBranchSelect.value;
         const title = titleInput.value;
@@ -226,7 +195,7 @@ declare const acquireVsCodeApi: () => VsCodeApi;
         showWaitingState(true);
     });
 
-    // --- NEW: Helper Function to get Codicon class based on filename ---
+    // Helper Function to get Codicon class based on filename 
     function getCodiconNameForFile(filename: string): string {
         const lowerFilename = filename.toLowerCase();
         // Use more semantic codicons where available
@@ -251,13 +220,12 @@ declare const acquireVsCodeApi: () => VsCodeApi;
     }
 
 
-    // --- Rendering Functions ---
+    // Rendering Functions 
 
     function populateBranchDropdown(selectElement: HTMLSelectElement, branches: string[] | undefined, defaultSelection?: string) {
         if (!selectElement) return;
-        // --- Store previously selected value before clearing ---
+        // Store previously selected value before clearing
         const previousValue = selectElement.value;
-        // --- End Store ---
 
         selectElement.innerHTML = '<option value="">Select branch...</option>';
 
@@ -318,7 +286,7 @@ declare const acquireVsCodeApi: () => VsCodeApi;
             // --- Add status class to the list item ---
             li.className = `file-list-item status-${status.toLowerCase()}`;
 
-             // --- Make clickable & store data ---
+             // Make clickable & store data 
             li.dataset.filename = file.path; // Store filename in data attribute
             li.dataset.status = status;      // Store status in data attribute
             li.tabIndex = 0; // Make it focusable
@@ -406,7 +374,7 @@ declare const acquireVsCodeApi: () => VsCodeApi;
     if(waitingMsg) waitingMsg.style.display = 'block'; // Show waiting message
 
 
-    // --- Initialization ---
+    // Initialization 
     console.log("Create PR webview script initialized.");
     vscode.postMessage({ command: 'webviewReady' });
     // Optional: Request initial file list immediately if needed

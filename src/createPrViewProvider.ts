@@ -1,49 +1,12 @@
 import * as vscode from 'vscode';
-import { getNonce } from './utils'; // Assuming getNonce is accessible (e.g., in utils.ts)
+import { getNonce } from './utils'; 
 import { getOctokit } from './auth';
-import type { Endpoints } from "@octokit/types"; // Import types for file data if needed
 import type { PullRequestInfo } from './prDataProvider';
-import { showDiffBetweenBranches } from './extension';
+import { showDiffBetweenBranches } from './prDescriptionProvider';
 
-// Define types for Git info we might need
-interface GitInfo {
-    headBranch?: string;
-    baseBranch?: string;
-    remoteUrl?: string;
-    owner?: string;
-    repo?: string;
-    changedFiles?: ChangedFile[]; // Define ChangedFile below
-    branches?: string[];
-}
-
-// Simple type for changed files (expand as needed)
-interface ChangedFile {
-    path: string;
-    status: 'A' | 'M' | 'D' | 'R' | 'C' | '?'; // Added, Modified, Deleted, Renamed, Copied, Untracked/Unknown
-}
+import { GitInfo, ChangedFile, FromCreatePrWebviewMessage, ComparisonFile } from './types'; 
 
 
-// Define the shape of messages sent TO the webview
-type ToCreatePrWebviewMessage =
-    | { command: 'loadFormData'; data: GitInfo }; // Includes branches now
-
-// Define the shape of messages sent FROM the webview
-type FromCreatePrWebviewMessage =
-    | { command: 'webviewReady' }
-    | { command: 'createPrRequest'; data: { base: string; head: string; title: string; body: string; } }
-    | { command: 'cancelPr' }
-    | { command: 'getChangedFiles' } // Webview can request file list
-    | { command: 'showError'; text: string }
-    | { command: 'compareBranches'; base: string; head: string }
-    | { command: 'showCreatePrDiff'; data: { base: string; head: string; filename: string; status: ChangedFile['status']; owner: string; repo: string } };
-
-
-type ComparisonFile = {
-    sha: string;
-    filename: string;
-    // Status from compareCommits API
-    status: "added" | "removed" | "modified" | "renamed" | "copied" | "changed" | "unchanged";
-};
 
 // Get the Git API 
 async function getGitApi() {
@@ -104,7 +67,7 @@ export class CreatePrViewProvider implements vscode.WebviewViewProvider {
             ]
         };
 
-        // Set initial HTML (can be loading state or the form shell)
+        // Set initial HTML 
         webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
 
         this._visibilityChangeListener = webviewView.onDidChangeVisibility(() => {
@@ -163,7 +126,7 @@ export class CreatePrViewProvider implements vscode.WebviewViewProvider {
                         break;
                 }
                 case 'createPrRequest': {
-                    // --- Execute the actual PR creation ---
+                    // Execute the actual PR creation
                     const octokit = await getOctokit();
                     const owner = this._currentGitInfo.owner;
                     const repo = this._currentGitInfo.repo;
@@ -199,17 +162,16 @@ export class CreatePrViewProvider implements vscode.WebviewViewProvider {
                                         // Add other fields from response.data if needed by your detail view
                                     };
 
-                                    vscode.commands.executeCommand('yourExtension.viewPullRequest', prInfo, true); // Pass true for isNewlyCreated
+                                    vscode.commands.executeCommand('yourExtension.viewPullRequest', prInfo, true); 
 
-                                    // 2. Execute the command to open the detail view
+                                    // Execute the command to open the detail view
                                     vscode.commands.executeCommand('yourExtension.viewPullRequest', prInfo);
-                                    // --- END ADD ---
 
 
-                                    // 3. Refresh the main PR list view
+                                    // Refresh the main PR list view
                                     vscode.commands.executeCommand('yourExtension.refreshPrView');
 
-                                     // 4. Reset the Create PR form by sending fresh initial data
+                                    //  Reset the Create PR form by sending fresh initial data
                                     await this.prepareAndSendData();
 
                                 } else {
@@ -235,15 +197,15 @@ export class CreatePrViewProvider implements vscode.WebviewViewProvider {
                          // Base/head will be undefined, title/desc cleared by webview
                     });
 
-                    // 1. Switch focus back to the main list view
+                    // Switch focus back to the main list view
                     await vscode.commands.executeCommand('yourPrViewId.focus');
-                    // 2. Set the context variable back to false to hide this view
+                    // Set the context variable back to false to hide this view
                     await vscode.commands.executeCommand('setContext', 'yourExtension:createPrViewVisible', false);
                     break;
                 }
 
                 case 'compareBranches': {
-                    // --- Get owner, repo, AND branches from stored info ---
+                    // Get owner, repo, AND branches from stored info
                     const owner = this._currentGitInfo.owner;
                     const repo = this._currentGitInfo.repo;
                     const branches = this._currentGitInfo.branches; // Get the stored list
@@ -254,20 +216,18 @@ export class CreatePrViewProvider implements vscode.WebviewViewProvider {
                         const comparisonFiles = await this.getComparisonFiles(
                             owner,
                             repo,
-                            data.base, // Use the new base from message data
-                            data.head  // Use the new head from message data
+                            data.base, 
+                            data.head 
                         );
                         console.log("Comparison result files:", comparisonFiles.length);
 
-                        // --- FIX: Send files, branches, and current selections back ---
+                        // Send files, branches, and current selections back 
                         this.sendDataToWebview({
                             changedFiles: comparisonFiles,
-                            branches: branches, // <<< Include the existing branch list
-                            baseBranch: data.base, // <<< Include current base selection
-                            headBranch: data.head  // <<< Include current head selection
-                            // Include owner/repo too if webview might need them? Unlikely here.
+                            branches: branches, // Send the list of branches
+                            baseBranch: data.base, // Include current base selection
+                            headBranch: data.head  // Include current head selection
                         });
-                        // --- END FIX ---
 
                     } else {
                         // Log details if something is missing
@@ -301,22 +261,19 @@ export class CreatePrViewProvider implements vscode.WebviewViewProvider {
 
     // Method called by the command in extension.ts to trigger loading data
     public async prepareAndSendData() {
-        console.log("CreatePrViewProvider: prepareAndSendData called."); // Log entry
+        console.log("CreatePrViewProvider: prepareAndSendData called."); 
         if (!this._view) {
             console.log("prepareAndSendData: View not available yet, attempting focus...");
             // Try to focus the view to trigger resolveWebviewView if not already resolved
-            // Note: Focusing might not work if the view container isn't visible.
              try {
                  await vscode.commands.executeCommand(`${CreatePrViewProvider.viewType}.focus`);
              } catch (e) {
                   console.warn("Focus command failed (maybe view container not visible):", e);
              }
              // It might take a moment for the view to resolve after focus
-             await new Promise(resolve => setTimeout(resolve, 150)); // Slightly longer delay?
+             await new Promise(resolve => setTimeout(resolve, 150));
              if (!this._view) {
                   console.error("Create PR View still not available after focus attempt.");
-                  // Optionally show a message if critical, but often the view appears later
-                  // vscode.window.showWarningMessage("Could not prepare Create PR form immediately.");
                   return;
              }
              console.log("prepareAndSendData: View became available after focus/delay.");
@@ -324,11 +281,9 @@ export class CreatePrViewProvider implements vscode.WebviewViewProvider {
              console.log("prepareAndSendData: View already available.");
         }
 
-        // Ensure view is visible before proceeding (might be redundant with visibility check, but safe)
+        // Ensure view is visible before proceeding 
         if (!this._view.visible) {
             console.log("prepareAndSendData: View is not visible, skipping data send.");
-            // We don't want to fetch/send data if the user just hid the view.
-            // The onDidChangeVisibility listener will trigger this again when it becomes visible.
             return;
         }
 
@@ -339,18 +294,14 @@ export class CreatePrViewProvider implements vscode.WebviewViewProvider {
             this.sendDataToWebview(this._currentGitInfo);
          } catch (error) {
               console.error("prepareAndSendData: Error fetching git info:", error);
-              // Optionally send an error state to the webview
-              // this.sendDataToWebview({ command: 'showError', text: 'Failed to load repository data.' });
-              // Or just send empty data to clear the form
               this.sendDataToWebview({}); // Send empty object
          }
     }
 
      // Helper to send data (avoids repeating the check)
-    private sendDataToWebview(gitInfo: GitInfo | Partial<GitInfo>) { // Allow empty object
+    private sendDataToWebview(gitInfo: GitInfo | Partial<GitInfo>) { 
         if (this._view?.visible) {
-            // Ensure owner and repo from the provider's state are included
-            // if they exist and aren't already in the partial gitInfo
+            // Ensure owner and repo from the provider's state are included if they exist and aren't already in the partial gitInfo
             const dataToSend = {
                 ...gitInfo, // Include data passed in (like changedFiles)
                 owner: this._currentGitInfo.owner ?? (gitInfo as GitInfo).owner, // Prefer provider's state
@@ -364,7 +315,7 @@ export class CreatePrViewProvider implements vscode.WebviewViewProvider {
         }
     }
 
-    // --- Method to compare branches ---
+    // Method to compare branches 
     private async getComparisonFiles(owner: string, repo: string, base: string, head: string): Promise<ChangedFile[]> {
         const octokit = await getOctokit();
         if (!octokit) {
@@ -541,7 +492,6 @@ export class CreatePrViewProvider implements vscode.WebviewViewProvider {
                  }
             } else {
                 // Fallback if tooltip is missing or not a string.
-                // This might happen if the decoration is not set up correctly or if file is untracked
                 console.warn(`Missing or invalid tooltip for ${change.resourceUri.fsPath}, unable to determine status reliably.`);
                 statusChar = '?';
             }
@@ -561,7 +511,6 @@ export class CreatePrViewProvider implements vscode.WebviewViewProvider {
         const codiconCssUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionContext.extensionUri, 'node_modules', '@vscode', 'codicons', 'dist', 'codicon.css'));
         const nonce = getNonce();
 
-        // Basic HTML structure for the form - Adapt based on the screenshot
         return `<!DOCTYPE html>
             <html lang="en">
             <head>
