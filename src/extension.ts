@@ -14,35 +14,6 @@ type Review = Endpoints["GET /repos/{owner}/{repo}/pulls/{pull_number}/reviews"]
 type CommitListItem = Endpoints["GET /repos/{owner}/{repo}/pulls/{pull_number}/commits"]["response"]["data"][0];
 type ChangedFileFromApi = Endpoints["GET /repos/{owner}/{repo}/pulls/{pull_number}/files"]["response"]["data"][0];
 
-type FromWebviewMessage =
-    | { command: 'webviewReady' }
-    | { command: 'showError'; text: string }
-    | { command: 'alert'; text: string }
-    | { command: 'mergePr'; data: { merge_method: 'merge' | 'squash' | 'rebase' } }
-    | { command: 'addComment'; text: string }
-    | { command: 'closePr' }
-    | { command: 'refreshThisPr' };
-
-type MergeStatusUpdateData = {
-    mergeable: boolean | null;
-    mergeable_state: string;
-};
-
-interface PrDetails {
-    timeline: TimelineItem[];
-    mergeable_state: string; 
-    mergeable: boolean | null;
-    // Fields for the header display
-    state: 'open' | 'closed';
-    merged: boolean;
-    authorLogin: string;
-    authorAvatarUrl?: string | null;
-    baseLabel: string; 
-    headLabel: string; 
-    body: string | null;
-    createdAt: string; 
-}
-
 // Timeline Item Structure 
 interface TimelineItemBase {
     timestamp: Date;
@@ -65,11 +36,6 @@ interface CommitTimelineItem extends TimelineItemBase {
     data: CommitListItem;
 }
 
-interface ChangedFile {
-    path: string;
-    status: 'A' | 'M' | 'D' | 'R' | 'C' | '?';
-}
-
 type TimelineItem = ReviewTimelineItem | ReviewCommentTimelineItem | IssueCommentTimelineItem | CommitTimelineItem;
 
 export type { TimelineItem }; // Export the main timeline type
@@ -84,8 +50,7 @@ interface ActivePrWebview {
     currentTimeline?: TimelineItem[]; 
 }
 const activePrDetailPanels = new Map<number, ActivePrWebview>(); // Keyed by PR number
-let pollingIntervalId: NodeJS.Timeout | undefined = undefined;
-const POLLING_INTERVAL_MS = 30000; // Poll every 30 seconds
+let pollingIntervalId: NodeJS.Timeout | undefined = undefined
 
 
 // =================================
