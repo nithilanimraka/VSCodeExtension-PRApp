@@ -58,10 +58,11 @@ body {
     border-radius: 3px;
     cursor: pointer;
     font-size: var(--vscode-font-size);
+    font-family: var(--vscode-font-family); /* Ensure button font matches */
     text-align: left;
     white-space: normal; /* Allow button text to wrap */
     line-height: 1.4;
-    transition: background-color 0.1s ease-in-out;
+    transition: background-color 0.1s ease-in-out, opacity 0.2s ease-in-out; /* Add opacity transition */
 }
 
 .preset-question-button:hover {
@@ -72,6 +73,17 @@ body {
     outline: 1px solid var(--vscode-focusBorder);
     outline-offset: -1px;
 }
+
+/* --- Style for disabled preset buttons --- */
+.preset-question-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background-color: var(--vscode-button-secondaryBackground); /* Keep base color */
+}
+.preset-question-button:disabled:hover {
+     background-color: var(--vscode-button-secondaryBackground); /* Prevent hover effect when disabled */
+}
+/* --------------------------------------- */
 
 
 /* Chat Area */
@@ -143,13 +155,21 @@ body {
     margin-right: 0;
 }
 
-.message .content p {
+/* Add text wrapping AND font styles */
+.message .content p,
+.message .content pre {
     margin: 0 0 5px 0;
-    word-wrap: break-word; /* Ensure long words break */
+    word-wrap: break-word; /* Break long words if necessary */
+    white-space: pre-wrap; /* Allow wrapping but preserve whitespace */
+    overflow-wrap: break-word; /* Alternative word breaking */
+    font-family: var(--vscode-font-family); /* Use the standard VS Code font */
+    font-size: var(--vscode-font-size); /* Use the standard VS Code font size */
 }
-.message .content p:last-child {
+.message .content p:last-child,
+.message .content pre:last-child {
     margin-bottom: 0;
 }
+
 
 /* Input Area */
 .input-area {
@@ -159,11 +179,19 @@ body {
     border-top: 1px solid var(--vscode-editorWidget-border);
     background-color: var(--vscode-editorWidget-background); /* Match message background */
     gap: 10px;
+    transition: opacity 0.2s ease-in-out; /* Add transition for disabled state */
 }
+
+/* --- Style for disabled input area --- */
+.input-area.disabled {
+    opacity: 0.6;
+}
+/* ------------------------------------- */
+
 
 #question-input {
     flex-grow: 1;
-    font-family: var(--vscode-font-family);
+    font-family: var(--vscode-font-family); /* Ensure input uses the same font */
     font-size: var(--vscode-font-size);
     color: var(--vscode-input-foreground);
     background-color: var(--vscode-input-background);
@@ -182,6 +210,14 @@ body {
     outline-offset: -1px;
     border-color: var(--vscode-focusBorder);
 }
+
+/* --- Style for disabled input --- */
+#question-input:disabled {
+    cursor: not-allowed;
+    /* Optional: slightly different background when disabled */
+    /* background-color: var(--vscode-input-disabledBackground, var(--vscode-input-background)); */
+}
+/* ------------------------------ */
 
 #send-button {
     flex-shrink: 0;
@@ -208,6 +244,17 @@ body {
     font-size: 1.4em; /* Adjust icon size */
 }
 
+/* --- Style for disabled send button --- */
+#send-button:disabled {
+    cursor: not-allowed;
+    background-color: var(--vscode-button-background); /* Keep base color */
+}
+#send-button:disabled:hover {
+     background-color: var(--vscode-button-background); /* Prevent hover */
+}
+/* ------------------------------------ */
+
+
 /* Spin animation */
 @keyframes codicon-spin {
 	100% {
@@ -217,3 +264,4 @@ body {
 .codicon-sync.spin {
     animation: codicon-spin 1.5s infinite linear;
 }
+

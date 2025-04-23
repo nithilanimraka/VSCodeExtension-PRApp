@@ -6,6 +6,7 @@ import { getCurrentRepositoryPath } from './gitUtils'; // Import helper
 // Simple map to hold active panels (can be expanded)
 const activeAnalyzerPanels = new Map<string, vscode.WebviewPanel>();
 const VIEW_TYPE = 'gitRepoAnalyzerView';
+const FASTAPI_URL = 'http://127.0.0.1:8000/analyze';
 
 export async function createOrShowAnalyzerWebview(context: vscode.ExtensionContext) {
     const column = vscode.window.activeTextEditor?.viewColumn || vscode.ViewColumn.One;
@@ -60,26 +61,91 @@ export async function createOrShowAnalyzerWebview(context: vscode.ExtensionConte
             switch (message.command) {
                 case 'webviewReady':
                     console.log('Analyzer webview is ready.');
-                    // Optionally send initial data if needed
-                    // panel.webview.postMessage({ command: 'initialData', ... });
                     break;
-                case 'askQuestion':
-                    const question = message.text;
-                    console.log('Received question from analyzer webview:', question);
+                    case 'askQuestion':
+                        const question = message.text;
+                        console.log('Received question from analyzer webview:', question);
+    
+                        // Get the current repository path dynamically
+                        const currentRepoPath = await getCurrentRepositoryPath();
+                        if (!currentRepoPath) {
+                            vscode.window.showErrorMessage("Could not determine the current Git repository path.");
+                            panel.webview.postMessage({ command: 'addErrorMessage', text: "Failed to find Git repository path." });
+                            return;
+                        }
+    
+                        // --- Call FastAPI Backend ---
+                        try {
+                            // Dynamically import node-fetch because the extension uses CommonJS
+                            const fetch = (await import('node-fetch')).default;
+    
+                            const response = await fetch(FASTAPI_URL, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Accept': 'text/plain', // Expecting plain text stream
+                                },
+                                body: JSON.stringify({
+                                    repo_path: currentRepoPath,
+                                    query: question
+                                })
+                            });
+    
+                            if (!response.ok) {
+                                // Handle HTTP errors (like 4xx, 5xx)
+                                const errorText = await response.text();
+                                console.error(`FastAPI request failed: ${response.status} ${response.statusText}`, errorText);
+                                panel.webview.postMessage({ command: 'addErrorMessage', text: `Server error (${response.status}): ${errorText || response.statusText}` });
+                                return;
+                            }
+    
+                            if (!response.body) {
+                                console.error("FastAPI response body is null.");
+                                panel.webview.postMessage({ command: 'addErrorMessage', text: "Received empty response from server." });
+                                return;
+                            }
+    
+                            // Signal start of bot message stream
+                            panel.webview.postMessage({ command: 'startBotMessage' });
+    
+                            // --- FIX: Process the stream using for await...of ---
+                            const decoder = new TextDecoder();
+                            // Treat response.body as an AsyncIterable<Uint8Array> or Buffer
+                            for await (const chunkBuffer of response.body) {
+                                // Decode the chunk (assuming it's Uint8Array or Buffer)
+                                // If chunkBuffer is already string, skip decoding
+                                let chunkText: string;
+                                if (typeof chunkBuffer === 'string') {
+                                    chunkText = chunkBuffer;
+                                } else {
+                                    chunkText = decoder.decode(chunkBuffer, { stream: true });
+                                }
+                                // Send chunk to webview
+                                panel.webview.postMessage({ command: 'addBotChunk', text: chunkText });
+                            }
+                            // --- End FIX ---
 
-                    // --- Placeholder for backend interaction ---
-                    // In a real scenario:
-                    // 1. Show loading/thinking indicator in webview
-                    //    panel.webview.postMessage({ command: 'showThinking' });
-                    // 2. Send question to your FastAPI backend
-                    //    const response = await sendToFastAPI(question, repoPath);
-                    // 3. Send response back to webview
-                    //    panel.webview.postMessage({ command: 'addBotMessage', text: response });
-
-                    // For now, just echo the question back as a bot message
-                    const echoResponse = `(Placeholder) You asked: "${question}"`;
-                    panel.webview.postMessage({ command: 'addBotMessage', text: echoResponse });
-                    return;
+                            // Signal end of stream (optional, but good practice)
+                            // The decoder needs a final call in case there were partial multi-byte chars
+                            const finalChunk = decoder.decode();
+                            if (finalChunk) {
+                                panel.webview.postMessage({ command: 'addBotChunk', text: finalChunk });
+                            }
+                            panel.webview.postMessage({ command: 'endBotMessage' });
+    
+    
+                        } catch (error: any) {
+                            console.error("Error calling FastAPI backend:", error);
+                            let errorMessage = "Failed to connect to the analysis server.";
+                            if (error.code === 'ECONNREFUSED') {
+                                errorMessage += " Please ensure the backend server is running.";
+                            } else if (error instanceof Error) {
+                                errorMessage += ` (${error.message})`;
+                            }
+                            panel.webview.postMessage({ command: 'addErrorMessage', text: errorMessage });
+                        }
+                        // --- End Call FastAPI Backend ---
+                        return; 
 
                 case 'showError': // Allow webview to request showing errors
                     if (message.text) {
@@ -103,16 +169,19 @@ function getAnalyzerWebviewHtml(context: vscode.ExtensionContext, webview: vscod
     const presetQuestions = [
         "Who's the most frequent contributor?",
         "Summarize the last change in the repository.",
-        "Contributor insights",
-        "Recent activity / cadence",
-        "Risk & quality signals",
-        "Ownership & bus-factor of files",
-        "Commit-Message Quality & Hygiene"
+        "What are the Contributor insights?",
+        "Provide the Commit-Message Quality based on days of the week",
+        "Give me the Recent activity / cadence",
+        "Provide me the Risk & quality signals of the repository",
+        "Give the Ownership & bus-factor of files"
+        
     ];
 
     let questionsHtml = '';
     presetQuestions.forEach(q => {
-        questionsHtml += `<button class="preset-question-button" data-question="${q}">${q}</button>\n`;
+        // Escape the question text properly for the data attribute
+        const escapedQ = q.replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        questionsHtml += `<button class="preset-question-button" data-question="${escapedQ}">${q}</button>\n`;
     });
 
     return `<!DOCTYPE html>
@@ -134,7 +203,7 @@ function getAnalyzerWebviewHtml(context: vscode.ExtensionContext, webview: vscod
 <body>
     <div class="analyzer-container">
         <aside class="sidebar">
-            <h2>REPOSITORY INSIGHTS</h2>
+            <h2>FAQs</h2>
             <div class="preset-questions">
                 ${questionsHtml}
             </div>

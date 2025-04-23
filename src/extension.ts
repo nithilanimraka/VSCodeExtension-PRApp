@@ -122,7 +122,7 @@ export function activate(context: vscode.ExtensionContext) {
         }
     ));
 
-    // Register Analyze Repository Command (placeholder function)
+    // Register Analyze Repository Command 
     context.subscriptions.push(vscode.commands.registerCommand('yourExtension.analyzeRepository', async () => {
         console.log("Analyze Repository command triggered!");
 
