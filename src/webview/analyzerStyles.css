@@ -1,0 +1,219 @@
+/* src/webview/analyzerStyles.css */
+body {
+    font-family: var(--vscode-font-family);
+    font-size: var(--vscode-font-size);
+    color: var(--vscode-foreground);
+    background-color: var(--vscode-editor-background);
+    margin: 0;
+    padding: 0;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden; /* Prevent body scrolling */
+}
+
+.analyzer-container {
+    display: flex;
+    flex-grow: 1; /* Take remaining height */
+    height: 100%; /* Ensure it takes full height */
+    overflow: hidden; /* Prevent container scrolling */
+}
+
+/* Sidebar */
+.sidebar {
+    width: 200px; /* Adjust width as needed */
+    flex-shrink: 0;
+    background-color: var(--vscode-sideBar-background, var(--vscode-editorWidget-background)); /* Use sidebar or editor widget bg */
+    border-right: 1px solid var(--vscode-sideBar-border, var(--vscode-editorWidget-border));
+    padding: 15px 10px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    overflow-y: auto; /* Scroll if sidebar content overflows */
+}
+
+.sidebar h2 {
+    font-size: 0.9em;
+    font-weight: bold;
+    color: var(--vscode-sideBarTitle-foreground);
+    margin: 0 0 5px 0;
+    padding: 0 5px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.preset-questions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.preset-question-button {
+    /* Use VS Code button styles */
+    background-color: var(--vscode-button-secondaryBackground);
+    color: var(--vscode-button-secondaryForeground);
+    border: 1px solid var(--vscode-button-secondaryBorder, var(--vscode-button-border, transparent));
+    padding: 6px 10px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: var(--vscode-font-size);
+    text-align: left;
+    white-space: normal; /* Allow button text to wrap */
+    line-height: 1.4;
+    transition: background-color 0.1s ease-in-out;
+}
+
+.preset-question-button:hover {
+    background-color: var(--vscode-button-secondaryHoverBackground);
+}
+
+.preset-question-button:focus {
+    outline: 1px solid var(--vscode-focusBorder);
+    outline-offset: -1px;
+}
+
+
+/* Chat Area */
+.chat-area {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden; /* Important: Prevent chat area itself from scrolling */
+    background-color: var(--vscode-editor-background);
+}
+
+.message-list {
+    flex-grow: 1;
+    overflow-y: auto; /* This is where the scrolling happens */
+    padding: 15px 20px;
+    box-sizing: border-box;
+}
+
+.message {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+    align-items: flex-start; /* Align avatar top */
+}
+
+.message .avatar {
+    flex-shrink: 0;
+    font-size: 1.6em; /* Make icon larger */
+    margin-top: 2px; /* Align icon slightly better with text */
+    color: var(--vscode-icon-foreground);
+    opacity: 0.8;
+}
+.message.user-message .avatar {
+    color: var(--vscode-charts-blue); /* Example color for user */
+}
+.message.bot-message .avatar {
+    color: var(--vscode-charts-green); /* Example color for bot */
+}
+.message.error-message .avatar {
+    color: var(--vscode-errorForeground);
+}
+.message.thinking-message .avatar {
+    color: var(--vscode-descriptionForeground);
+}
+
+
+.message .content {
+    background-color: var(--vscode-editorWidget-background); /* Slightly different background for messages */
+    padding: 8px 12px;
+    border-radius: 6px;
+    max-width: 80%; /* Prevent messages getting too wide */
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    line-height: 1.5;
+}
+
+.message.user-message .content {
+    background-color: var(--vscode-list-activeSelectionBackground); /* Different bg for user */
+    color: var(--vscode-list-activeSelectionForeground);
+    margin-left: auto; /* Align user messages to the right */
+}
+/* Adjust alignment for user message */
+.message.user-message {
+    justify-content: flex-end;
+}
+/* Put user avatar on the right */
+.message.user-message .avatar {
+    order: 1; /* Move avatar after content in flex flow */
+    margin-left: 10px;
+    margin-right: 0;
+}
+
+.message .content p {
+    margin: 0 0 5px 0;
+    word-wrap: break-word; /* Ensure long words break */
+}
+.message .content p:last-child {
+    margin-bottom: 0;
+}
+
+/* Input Area */
+.input-area {
+    display: flex;
+    align-items: flex-end; /* Align items to bottom */
+    padding: 10px 15px;
+    border-top: 1px solid var(--vscode-editorWidget-border);
+    background-color: var(--vscode-editorWidget-background); /* Match message background */
+    gap: 10px;
+}
+
+#question-input {
+    flex-grow: 1;
+    font-family: var(--vscode-font-family);
+    font-size: var(--vscode-font-size);
+    color: var(--vscode-input-foreground);
+    background-color: var(--vscode-input-background);
+    border: 1px solid var(--vscode-input-border, var(--vscode-editorWidget-border));
+    border-radius: 3px;
+    padding: 8px 10px;
+    resize: none; /* Disable manual resize */
+    overflow-y: auto; /* Allow scrolling if max-height is reached */
+    line-height: 1.4;
+    box-sizing: border-box; /* Include padding/border in height */
+    max-height: 150px; /* Limit input height */
+}
+
+#question-input:focus {
+    outline: 1px solid var(--vscode-focusBorder);
+    outline-offset: -1px;
+    border-color: var(--vscode-focusBorder);
+}
+
+#send-button {
+    flex-shrink: 0;
+    background-color: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
+    border: 1px solid var(--vscode-button-border, transparent);
+    border-radius: 3px;
+    cursor: pointer;
+    padding: 0; /* Remove padding for icon button */
+    width: 34px; /* Fixed width */
+    height: 34px; /* Fixed height to match input line */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+#send-button:hover {
+    background-color: var(--vscode-button-hoverBackground);
+}
+#send-button:focus {
+     outline: 1px solid var(--vscode-focusBorder);
+     outline-offset: 1px;
+}
+#send-button .codicon {
+    font-size: 1.4em; /* Adjust icon size */
+}
+
+/* Spin animation */
+@keyframes codicon-spin {
+	100% {
+		transform: rotate(360deg);
+	}
+}
+.codicon-sync.spin {
+    animation: codicon-spin 1.5s infinite linear;
+}

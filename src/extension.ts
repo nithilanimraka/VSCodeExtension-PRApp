@@ -1,26 +1,28 @@
 import * as vscode from 'vscode';
 import { getGitHubSession } from './auth';
 import { PrDataProvider, PullRequestItem } from './prDataProvider';
-import type { Endpoints } from "@octokit/types"; 
+import type { Endpoints } from "@octokit/types";
 import type { PullRequestInfo } from './prDataProvider';
-import { CreatePrViewProvider } from './createPrViewProvider'; 
+import { CreatePrViewProvider } from './createPrViewProvider';
+import * as AnalyzeViewManager from './analyzeViewManager';
+import { isGitRepositoryAvailable, getGitApi } from './gitUtils';
 
-import * as PrDescription from './prDescriptionProvider'; 
+import * as PrDescription from './prDescriptionProvider';
 
-// Type Definitions for GitHub API Responses 
+// Type Definitions for GitHub API Responses
 type IssueComment = Endpoints["GET /repos/{owner}/{repo}/issues/{issue_number}/comments"]["response"]["data"][0];
 type ReviewComment = Endpoints["GET /repos/{owner}/{repo}/pulls/{pull_number}/comments"]["response"]["data"][0];
 type Review = Endpoints["GET /repos/{owner}/{repo}/pulls/{pull_number}/reviews"]["response"]["data"][0];
 type CommitListItem = Endpoints["GET /repos/{owner}/{repo}/pulls/{pull_number}/commits"]["response"]["data"][0];
 type ChangedFileFromApi = Endpoints["GET /repos/{owner}/{repo}/pulls/{pull_number}/files"]["response"]["data"][0];
 
-// Timeline Item Structure 
+// Timeline Item Structure
 interface TimelineItemBase {
     timestamp: Date;
 }
 interface ReviewTimelineItem extends TimelineItemBase {
     type: 'review';
-    // Associated comments directly to the data payload 
+    // Associated comments directly to the data payload
     data: Review & { associated_comments?: ReviewComment[] };
 }
 interface ReviewCommentTimelineItem extends TimelineItemBase {
@@ -46,8 +48,8 @@ let prDataProvider: PrDataProvider | undefined;
 interface ActivePrWebview {
     panel: vscode.WebviewPanel;
     prInfo: PullRequestInfo;
-    lastCommentCheckTime?: Date; 
-    currentTimeline?: TimelineItem[]; 
+    lastCommentCheckTime?: Date;
+    currentTimeline?: TimelineItem[];
 }
 const activePrDetailPanels = new Map<number, ActivePrWebview>(); // Keyed by PR number
 let pollingIntervalId: NodeJS.Timeout | undefined = undefined
@@ -60,18 +62,18 @@ export function activate(context: vscode.ExtensionContext) {
 
     console.log('Congratulations, your extension "your-pr-extension" is now active!');
 
-    // Register Tree Data Provider 
+    // Register Tree Data Provider
     prDataProvider = new PrDataProvider();
     context.subscriptions.push(vscode.window.registerTreeDataProvider('yourPrViewId', prDataProvider));
 
-    // Register Create PR View 
+    // Register Create PR View
     // Store the provider instance so the command can call it
     const createPrViewProvider = new CreatePrViewProvider(context);
     context.subscriptions.push(
         vscode.window.registerWebviewViewProvider(CreatePrViewProvider.viewType, createPrViewProvider)
     );
 
-    // Register Commands 
+    // Register Commands
 
     // Refresh Command
     context.subscriptions.push(vscode.commands.registerCommand('yourExtension.refreshPrView', () => {
@@ -81,10 +83,10 @@ export function activate(context: vscode.ExtensionContext) {
         }
     }));
 
-    // Show Create Pull Request View 
+    // Show Create Pull Request View
     context.subscriptions.push(vscode.commands.registerCommand('yourExtension.showCreatePullRequestView', async () => {
         await vscode.commands.executeCommand('setContext', 'yourExtension:createPrViewVisible', true);
-        // Explicitly focus the view 
+        // Explicitly focus the view
         await vscode.commands.executeCommand('yourCreatePrViewId.focus');
         // Tell the provider to load its data
         // Small delay might be needed after focus before provider is fully ready
@@ -120,6 +122,21 @@ export function activate(context: vscode.ExtensionContext) {
         }
     ));
 
+    // Register Analyze Repository Command (placeholder function)
+    context.subscriptions.push(vscode.commands.registerCommand('yourExtension.analyzeRepository', async () => {
+        console.log("Analyze Repository command triggered!");
+
+        // Check if Git is available before opening the webview
+        const gitAvailable = await isGitRepositoryAvailable();
+        if (!gitAvailable) {
+            vscode.window.showWarningMessage("Cannot analyze: No active Git repository found in the workspace.");
+            return; // Stop execution if no Git repo
+        }
+
+        // If Git is available, create or show the analyzer webview
+        await AnalyzeViewManager.createOrShowAnalyzerWebview(context);
+    }));
+
     // Sign In Command
     context.subscriptions.push(vscode.commands.registerCommand('yourExtension.signIn', async () => {
         const session = await getGitHubSession();
@@ -139,10 +156,12 @@ export async function createTempFile(context: vscode.ExtensionContext, fileName:
     // Use extension's global storage path for temp files
     const safeFileName = fileName.replace(/[\\/?*:|"<>]/g, '_'); // More robust sanitization
     // Ensure global storage directory exists (VS Code should handle this, but belt-and-suspenders)
-    try { 
-        await vscode.workspace.fs.createDirectory(context.globalStorageUri); 
-    } catch(e) { 
-        vscode.window.showErrorMessage(`Failed to create global storage directory: ${e}`); 
+    try {
+        await vscode.workspace.fs.createDirectory(context.globalStorageUri);
+    } catch(e) {
+        // Handle error, e.g., show a message or log, but maybe don't block file creation
+         console.warn(`Could not ensure global storage directory exists: ${e}`);
+         // vscode.window.showErrorMessage(`Failed to create global storage directory: ${e}`); // Might be too noisy
     }
     // Create the file URI
     const uri = vscode.Uri.joinPath(context.globalStorageUri, safeFileName);
@@ -187,6 +206,3 @@ export function deactivate() {
 
     console.log("Your PR extension deactivated.");
 }
-
-
-

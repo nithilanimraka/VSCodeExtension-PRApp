@@ -14,6 +14,7 @@
   ],
   "activationEvents": [
     "onView:yourPrViewId",
+    "onCommand:yourExtension.analyzeRepository",
     "onCommand:yourExtension.showCreatePullRequestView",
     "onCommand:yourExtension.refreshPrView",
     "onCommand:yourExtension.viewPullRequest",
@@ -55,6 +56,10 @@
       {
         "command": "yourExtension.viewDiff",
         "title": "View Pull Request Diff"
+      },
+      {
+        "command": "yourExtension.analyzeRepository",
+        "title": "Analyze Git Repository"
       }
     ],
     "menus": {
@@ -69,7 +74,7 @@
           "when": "view == yourPrViewId",
           "group": "navigation@1"
         }
-        
+
       ],
       "view/item/context": []
     },
@@ -91,7 +96,7 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run esbuild-base -- --minify",
-    "esbuild-base": "esbuild ./src/extension.ts ./src/webview/main.ts ./src/webview/styles.css ./src/webview/createPrMain.ts ./src/webview/createPrStyles.css --bundle --external:vscode --format=cjs --platform=node --outdir=dist/ --entry-names=[dir]/[name] --outbase=src",
+    "esbuild-base": "esbuild ./src/extension.ts ./src/webview/main.ts ./src/webview/styles.css ./src/webview/createPrMain.ts ./src/webview/createPrStyles.css ./src/webview/analyzerMain.ts ./src/webview/analyzerStyles.css --bundle --external:vscode --format=cjs --platform=node --outdir=dist/ --entry-names=[dir]/[name] --outbase=src",
     "build": "npm run esbuild-base -- --sourcemap",
     "watch": "npm run esbuild-base -- --sourcemap --watch",
     "pretest": "npm run build && npm run lint",
