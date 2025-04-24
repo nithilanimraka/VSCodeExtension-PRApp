@@ -1,5 +1,6 @@
 // src/analyzeViewManager.ts
 import * as vscode from 'vscode';
+import * as path from 'path';
 import { getNonce } from './utils';
 import { getCurrentRepositoryPath } from './gitUtils'; // Import helper
 
@@ -13,8 +14,10 @@ export async function createOrShowAnalyzerWebview(context: vscode.ExtensionConte
     const repoPath = await getCurrentRepositoryPath(); // Get repo path for potential context
 
     // Use repo path as a unique identifier if available, otherwise a default key
+    const repoName = repoPath ? path.basename(repoPath) : undefined;
     const panelId = repoPath || 'defaultAnalyzerPanel';
-    const panelTitle = repoPath ? `Analyze: ${vscode.workspace.asRelativePath(repoPath)}` : "Analyze Git Repository";
+    // Use the extracted repoName for the title
+    const panelTitle = repoName ? `Analyze: ${repoName}` : "Analyze Git Repository";
 
     // If panel already exists, show it.
     const existingPanel = activeAnalyzerPanels.get(panelId);

@@ -22,6 +22,7 @@ interface Message {
 
     let thinkingMessageElement: HTMLDivElement | null = null;
     let currentBotMessageElement: HTMLDivElement | null = null; // To hold the element being streamed into
+    let receivedFirstBotToken = false; // Flag to track if the first token has been received
 
     // --- Helper Functions ---
 
@@ -72,9 +73,6 @@ interface Message {
     }
 
     function startBotMessageStream() {
-        // --- This is the primary place to remove the thinking indicator ---
-        removeThinkingIndicator();
-        // ------------------------------------------------------------------
 
         // Create a new bot message container but leave content empty initially
         currentBotMessageElement = createMessageElement({ type: 'bot', text: '' });
@@ -89,10 +87,16 @@ interface Message {
         if (messageList) {
             messageList.appendChild(currentBotMessageElement);
             scrollToBottom();
+            receivedFirstBotToken = false; 
         }
     }
 
     function appendToCurrentBotMessage(chunk: string) {
+        // first visible token: hide the spinner once
+        if (!receivedFirstBotToken) {
+            removeThinkingIndicator();
+            receivedFirstBotToken = true;
+        }
         if (currentBotMessageElement) {
             const contentDiv = currentBotMessageElement.querySelector('.content');
             // Target the <pre> tag specifically for appending streamed content
@@ -135,25 +139,6 @@ interface Message {
         setInputDisabled(false);
         // ----------------------------------------
     }
-
-    // function showThinkingIndicator() {
-    //     if (thinkingMessageElement) return; // Already showing
-    //     removeThinkingIndicator(); // Remove any previous one just in case
-    //     currentBotMessageElement = null; // Cannot be streaming and thinking
-
-    //     thinkingMessageElement = document.createElement('div');
-    //     thinkingMessageElement.classList.add('message', `thinking-message`);
-    //     thinkingMessageElement.innerHTML = `
-    //         <span class="codicon codicon-sync spin avatar"></span>
-    //         <div class="content">
-    //             <p><i>Thinking...</i></p>
-    //         </div>
-    //     `;
-    //     if (messageList) {
-    //         messageList.appendChild(thinkingMessageElement);
-    //         scrollToBottom();
-    //     }
-    // }
 
     function showThinkingIndicator() {
         if (thinkingMessageElement) return; // Already showing
@@ -292,7 +277,6 @@ interface Message {
         switch (message.command) {
             case 'startBotMessage':
                 // This is now the main place to remove the indicator
-                removeThinkingIndicator();
                 startBotMessageStream();
                 break;
             case 'addBotChunk':
