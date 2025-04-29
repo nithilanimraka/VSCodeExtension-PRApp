@@ -1,3 +1,5 @@
+import { escapeHtml } from '../utils';
+
 interface VsCodeApi {
     postMessage(message: any): void;
     getState(): any;
@@ -195,16 +197,6 @@ interface Message {
 
         // Show thinking indicator IMMEDIATELY after sending
         showThinkingIndicator();
-    }
-
-    function escapeHtml(unsafe: string): string {
-        // Basic escape function to prevent XSS
-        return unsafe
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
-            .replace(/"/g, "&quot;")
-            .replace(/'/g, "&#039;");
     }
 
     function adjustTextareaHeight() {
