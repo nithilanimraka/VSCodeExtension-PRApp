@@ -130,10 +130,10 @@ export class PrDataProvider implements vscode.TreeDataProvider<vscode.TreeItem> 
         }
     }
 
-    // Helper function to create the Analyze Repo Tree Item
+    // Function to create the Analyze Repo Tree Item
     private async createAnalyzeRepoTreeItem(gitAvailable: boolean): Promise<vscode.TreeItem> {
         const analyzeItem = new vscode.TreeItem("Analyze Git Repository", vscode.TreeItemCollapsibleState.None);
-        analyzeItem.iconPath = new vscode.ThemeIcon('beaker');
+        analyzeItem.iconPath = new vscode.ThemeIcon('beaker', new vscode.ThemeColor('gitDecoration.addedResourceForeground')); 
         analyzeItem.contextValue = 'analyzeRepoAction'; // Optional context value
 
         if (gitAvailable) {
@@ -141,7 +141,7 @@ export class PrDataProvider implements vscode.TreeDataProvider<vscode.TreeItem> 
             analyzeItem.command = {
                 command: 'yourExtension.analyzeRepository', // Command to be triggered
                 title: "Analyze Git Repository",
-                arguments: [] // No arguments needed for now
+                arguments: [] 
             };
         } else {
             analyzeItem.tooltip = "Requires an initialized Git repository in the workspace";
@@ -231,13 +231,10 @@ export class PrDataProvider implements vscode.TreeDataProvider<vscode.TreeItem> 
         const workspaceFolder = folders[0].uri; // Simplistic: assumes first folder
 
         try {
-            // This is a very basic way; a robust solution uses the Git extension API
-            // or parses .git/config manually or uses a git CLI wrapper.
             const gitConfigPath = vscode.Uri.joinPath(workspaceFolder, '.git/config');
             const configContentBytes = await vscode.workspace.fs.readFile(gitConfigPath);
             const configContent = new TextDecoder().decode(configContentBytes);
 
-            // Very basic parsing (prone to errors with complex configs)
             const remoteUrlMatch = /\[remote "origin"\]\s*url = (?:git@github\.com:|https:\/\/github\.com\/)([\w-]+)\/([\w-]+)(?:\.git)?/m.exec(configContent);
              if (remoteUrlMatch && remoteUrlMatch.length >= 3) {
                 return { owner: remoteUrlMatch[1], repo: remoteUrlMatch[2] };

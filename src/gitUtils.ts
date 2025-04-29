@@ -1,4 +1,3 @@
-// src/gitUtils.ts
 import * as vscode from 'vscode';
 
 // Get the Git API
@@ -6,7 +5,6 @@ export async function getGitApi() {
     try {
         const extension = vscode.extensions.getExtension('vscode.git');
         if (!extension) {
-            // Don't show error message here, let caller decide
             console.warn('Git extension (vscode.git) not found.');
             return undefined;
         }
@@ -18,7 +16,6 @@ export async function getGitApi() {
         const api = extension.exports.getAPI(1);
         // Check if repositories array exists and has items
         if (!api || !api.repositories || api.repositories.length === 0) {
-            // Don't show warning here, let caller decide
             console.warn("No Git repositories found or Git API not ready.");
             return undefined;
         }
@@ -26,7 +23,6 @@ export async function getGitApi() {
 
     } catch (error) {
         console.error("Failed to get Git API:", error);
-        // Don't show error message here, let caller decide
         return undefined;
     }
 }

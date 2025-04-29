@@ -1,5 +1,3 @@
-// src/webview/analyzerMain.ts
-
 interface VsCodeApi {
     postMessage(message: any): void;
     getState(): any;
@@ -24,7 +22,6 @@ interface Message {
     let currentBotMessageElement: HTMLDivElement | null = null; // To hold the element being streamed into
     let receivedFirstBotToken = false; // Flag to track if the first token has been received
 
-    // --- Helper Functions ---
 
     function createMessageElement(message: Message): HTMLDivElement {
         const messageElement = document.createElement('div');
@@ -42,9 +39,8 @@ interface Message {
         }
 
 
-        // Use <pre> for bot content initially to preserve whitespace from chunks
         const contentTag = (message.type === 'bot' || message.type === 'thinking' || message.type === 'error') ? 'pre' : 'p';
-        // Use italics for thinking message
+
         const messageText = message.type === 'thinking' ? `<i>${escapeHtml(message.text)}</i>` : escapeHtml(message.text);
 
 
@@ -99,7 +95,6 @@ interface Message {
         }
         if (currentBotMessageElement) {
             const contentDiv = currentBotMessageElement.querySelector('.content');
-            // Target the <pre> tag specifically for appending streamed content
             const textElement = contentDiv?.querySelector('pre');
             if (textElement) {
                 // Append text content directly to preserve whitespace and avoid HTML interpretation
@@ -107,7 +102,7 @@ interface Message {
                 scrollToBottom(); // Keep scrolling as content grows
             }
         } else {
-            // Fallback: If no current message element, create one (shouldn't happen with startBotMessage)
+            // Fallback: If no current message element, create one 
             console.warn("Received chunk but no current bot message element. Creating new one.");
             // Create a new message element for this chunk
             const messageElement = createMessageElement({ type: 'bot', text: chunk });
@@ -119,25 +114,9 @@ interface Message {
     }
 
     function endBotMessageStream() {
-        // Optional: Perform any cleanup after stream ends, e.g., markdown rendering
-        if (currentBotMessageElement) {
-            const contentDiv = currentBotMessageElement.querySelector('.content');
-            const textElement = contentDiv?.querySelector('pre'); // Still target pre
-            if (textElement) {
-                // Example: If you want to render markdown *after* streaming is complete
-                // try {
-                //     const markdownHtml = yourMarkdownParser(textElement.textContent || '');
-                //     contentDiv.innerHTML = markdownHtml; // Replace <pre> with rendered HTML
-                // } catch (e) {
-                //     console.error("Markdown parsing failed:", e);
-                // }
-            }
-        }
         currentBotMessageElement = null; // Reset for the next message
 
-        // --- Re-enable input when stream ends ---
         setInputDisabled(false);
-        // ----------------------------------------
     }
 
     function showThinkingIndicator() {
@@ -187,7 +166,7 @@ interface Message {
                 questionInput?.focus();
             }
         }
-         // Also disable/enable preset buttons
+         // Disable/enable preset buttons
          presetButtonContainer?.querySelectorAll('button').forEach(button => {
              (button as HTMLButtonElement).disabled = disabled;
          });
@@ -199,9 +178,8 @@ interface Message {
             return;
         }
 
-        // --- Disable input before sending ---
+        // Disable input before sending 
         setInputDisabled(true);
-        // ------------------------------------
 
         // Add user message to UI
         addMessageToUI({ type: 'user', text: question });
@@ -220,7 +198,7 @@ interface Message {
     }
 
     function escapeHtml(unsafe: string): string {
-        // Basic escape, consider a library for more complex needs
+        // Basic escape function to prevent XSS
         return unsafe
             .replace(/&/g, "&amp;")
             .replace(/</g, "&lt;")
@@ -233,20 +211,20 @@ interface Message {
         if (!questionInput) return;
         questionInput.style.height = 'auto'; // Temporarily shrink
         const scrollHeight = questionInput.scrollHeight;
-        // Set a max height (e.g., 150px)
         const maxHeight = 150;
         questionInput.style.height = `${Math.min(scrollHeight, maxHeight)}px`;
     }
 
-    // --- Event Listeners ---
+    // Event listeners
 
+    // Send button click
     sendButton?.addEventListener('click', () => {
         sendMessage(questionInput.value);
     });
 
+    // Enter key press
     questionInput?.addEventListener('keydown', (event) => {
-        // Send on Enter (Shift+Enter for newline)
-        // Check if input is disabled before sending
+        // Check if Enter key is pressed without Shift
         if (event.key === 'Enter' && !event.shiftKey && !questionInput.disabled) {
             event.preventDefault(); // Prevent default newline
             sendMessage(questionInput.value);
@@ -272,15 +250,13 @@ interface Message {
     // Listen for messages from the extension host
     window.addEventListener('message', event => {
         const message = event.data;
-        console.log("Analyzer webview received message:", message); // Debugging
+        console.log("Analyzer webview received message:", message); 
 
         switch (message.command) {
             case 'startBotMessage':
-                // This is now the main place to remove the indicator
                 startBotMessageStream();
                 break;
             case 'addBotChunk':
-                // No need to remove indicator here if startBotMessage is reliable
                 appendToCurrentBotMessage(message.text);
                 break;
             case 'endBotMessage':
@@ -291,15 +267,13 @@ interface Message {
                 removeThinkingIndicator();
                 currentBotMessageElement = null; // Stop streaming if error occurs
                 addMessageToUI({ type: 'error', text: `Error: ${message.text}` });
-                // --- Re-enable input on error ---
+                // Re-enable input on error
                 setInputDisabled(false);
-                // --------------------------------
                 break;
-            // Add cases for 'initialData' etc. if needed later
         }
     });
 
-    // --- Initialization ---
+    // Initialization 
     adjustTextareaHeight(); // Initial height adjustment
     setInputDisabled(false); // Ensure input is enabled initially
     vscode.postMessage({ command: 'webviewReady' });

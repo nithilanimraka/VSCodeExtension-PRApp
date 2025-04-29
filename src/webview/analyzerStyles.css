@@ -21,7 +21,7 @@ body {
 
 /* Sidebar */
 .sidebar {
-    width: 200px; /* Adjust width as needed */
+    width: 200px; 
     flex-shrink: 0;
     background-color: var(--vscode-sideBar-background, var(--vscode-editorWidget-background)); /* Use sidebar or editor widget bg */
     border-right: 1px solid var(--vscode-sideBar-border, var(--vscode-editorWidget-border));
@@ -171,7 +171,7 @@ body {
 }
 
 
-/* Input Area */
+
 .input-area {
     display: flex;
     align-items: flex-end; /* Align items to bottom */
@@ -182,12 +182,9 @@ body {
     transition: opacity 0.2s ease-in-out; /* Add transition for disabled state */
 }
 
-/* --- Style for disabled input area --- */
 .input-area.disabled {
     opacity: 0.6;
 }
-/* ------------------------------------- */
-
 
 #question-input {
     flex-grow: 1;
@@ -202,7 +199,7 @@ body {
     overflow-y: auto; /* Allow scrolling if max-height is reached */
     line-height: 1.4;
     box-sizing: border-box; /* Include padding/border in height */
-    max-height: 150px; /* Limit input height */
+    max-height: 150px; 
 }
 
 #question-input:focus {
@@ -211,13 +208,10 @@ body {
     border-color: var(--vscode-focusBorder);
 }
 
-/* --- Style for disabled input --- */
+
 #question-input:disabled {
     cursor: not-allowed;
-    /* Optional: slightly different background when disabled */
-    /* background-color: var(--vscode-input-disabledBackground, var(--vscode-input-background)); */
 }
-/* ------------------------------ */
 
 #send-button {
     flex-shrink: 0;
@@ -226,9 +220,9 @@ body {
     border: 1px solid var(--vscode-button-border, transparent);
     border-radius: 3px;
     cursor: pointer;
-    padding: 0; /* Remove padding for icon button */
-    width: 34px; /* Fixed width */
-    height: 34px; /* Fixed height to match input line */
+    padding: 0; 
+    width: 34px;
+    height: 34px; 
     display: flex;
     align-items: center;
     justify-content: center;
@@ -241,18 +235,16 @@ body {
      outline-offset: 1px;
 }
 #send-button .codicon {
-    font-size: 1.4em; /* Adjust icon size */
+    font-size: 1.4em; 
 }
 
-/* --- Style for disabled send button --- */
 #send-button:disabled {
     cursor: not-allowed;
-    background-color: var(--vscode-button-background); /* Keep base color */
+    background-color: var(--vscode-button-background); 
 }
 #send-button:disabled:hover {
-     background-color: var(--vscode-button-background); /* Prevent hover */
+     background-color: var(--vscode-button-background); 
 }
-/* ------------------------------------ */
 
 
 /* Spin animation */

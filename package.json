@@ -74,7 +74,6 @@
           "when": "view == yourPrViewId",
           "group": "navigation@1"
         }
-
       ],
       "view/item/context": []
     },
@@ -121,6 +120,7 @@
     "@types/markdown-it": "^14.1.2",
     "@types/node-fetch": "^2.6.12",
     "markdown-it": "^14.1.0",
-    "node-fetch": "^3.3.2"
+    "node-fetch": "^3.3.2",
+    "uuid": "^11.1.0"
   }
 }

@@ -1,34 +1,43 @@
-// src/analyzeViewManager.ts
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { getNonce } from './utils';
-import { getCurrentRepositoryPath } from './gitUtils'; // Import helper
+import { getCurrentRepositoryPath } from './gitUtils';
+import { v4 as uuidv4 } from 'uuid'; 
+import fetch from 'node-fetch'; 
 
-// Simple map to hold active panels (can be expanded)
-const activeAnalyzerPanels = new Map<string, vscode.WebviewPanel>();
+
+// Store panel and its session ID
+interface ActiveAnalyzerPanelInfo {
+    panel: vscode.WebviewPanel;
+    sessionId: string;
+}
+const activeAnalyzerPanels = new Map<string, ActiveAnalyzerPanelInfo>(); // Keyed by panelId (repoPath or default)
+
 const VIEW_TYPE = 'gitRepoAnalyzerView';
 const FASTAPI_URL = 'http://127.0.0.1:8000/analyze';
+const FASTAPI_END_SESSION_URL = 'http://127.0.0.1:8000/end_session';
 
 export async function createOrShowAnalyzerWebview(context: vscode.ExtensionContext) {
     const column = vscode.window.activeTextEditor?.viewColumn || vscode.ViewColumn.One;
-    const repoPath = await getCurrentRepositoryPath(); // Get repo path for potential context
+    const repoPath = await getCurrentRepositoryPath();
 
-    // Use repo path as a unique identifier if available, otherwise a default key
     const repoName = repoPath ? path.basename(repoPath) : undefined;
-    const panelId = repoPath || 'defaultAnalyzerPanel';
-    // Use the extracted repoName for the title
+    const panelId = repoPath || 'defaultAnalyzerPanel'; // Use repo path or default as the KEY for the map
     const panelTitle = repoName ? `Analyze: ${repoName}` : "Analyze Git Repository";
 
-    // If panel already exists, show it.
-    const existingPanel = activeAnalyzerPanels.get(panelId);
-    if (existingPanel) {
+    const existingPanelInfo = activeAnalyzerPanels.get(panelId);
+    if (existingPanelInfo) {
         console.log(`Revealing existing analyzer panel for: ${panelId}`);
-        existingPanel.reveal(column);
+        existingPanelInfo.panel.reveal(column);
+        // Ensure title is up-to-date if repo context changed somehow (edge case)
+        existingPanelInfo.panel.title = panelTitle;
         return;
     }
 
-    // Otherwise, create a new panel.
-    console.log(`Creating new analyzer panel for: ${panelId}`);
+    // Generate a unique session ID for the new panel
+    const sessionId = uuidv4();
+    console.log(`Creating new analyzer panel for: ${panelId} with session ID: ${sessionId}`);
+
     const panel = vscode.window.createWebviewPanel(
         VIEW_TYPE,
         panelTitle,
@@ -36,23 +45,43 @@ export async function createOrShowAnalyzerWebview(context: vscode.ExtensionConte
         {
             enableScripts: true,
             localResourceRoots: [
-                vscode.Uri.joinPath(context.extensionUri, 'dist', 'webview'), // Bundled JS/CSS
-                vscode.Uri.joinPath(context.extensionUri, 'node_modules', '@vscode', 'codicons', 'dist') // Codicons
+                vscode.Uri.joinPath(context.extensionUri, 'dist', 'webview'),
+                vscode.Uri.joinPath(context.extensionUri, 'node_modules', '@vscode', 'codicons', 'dist')
             ],
-            retainContextWhenHidden: true // Keep state when tab is not visible
+            retainContextWhenHidden: true
         }
     );
 
-    activeAnalyzerPanels.set(panelId, panel);
+    // Store the panel and its session ID
+    const panelInfo: ActiveAnalyzerPanelInfo = { panel, sessionId };
+    activeAnalyzerPanels.set(panelId, panelInfo);
 
-    // Set the webview's initial html content
     panel.webview.html = getAnalyzerWebviewHtml(context, panel.webview);
 
-    // Listen for when the panel is disposed
     panel.onDidDispose(
-        () => {
-            console.log(`Disposing analyzer panel for: ${panelId}`);
-            activeAnalyzerPanels.delete(panelId);
+        async () => { 
+            console.log(`Disposing analyzer panel for: ${panelId} (Session ID: ${sessionId})`);
+            activeAnalyzerPanels.delete(panelId); // Remove panel from map
+
+            // Call backend to end the session 
+            try {
+                // Use the specific sessionId associated with the disposed panel
+                console.log(`Notifying backend to end session: ${sessionId}`);
+                const response = await fetch(FASTAPI_END_SESSION_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session_id: sessionId })
+                });
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error(`Failed to end session ${sessionId} on backend: ${response.status} ${response.statusText}`, errorText);
+                } else {
+                    console.log(`Session ${sessionId} ended successfully on backend.`);
+                }
+            } catch (error: any) {
+                console.error(`Error calling end_session endpoint for ${sessionId}:`, error);
+            }
+
         },
         null,
         context.subscriptions
@@ -63,94 +92,80 @@ export async function createOrShowAnalyzerWebview(context: vscode.ExtensionConte
         async message => {
             switch (message.command) {
                 case 'webviewReady':
-                    console.log('Analyzer webview is ready.');
+                    console.log(`Analyzer webview ready for session: ${sessionId}`);
                     break;
-                    case 'askQuestion':
-                        const question = message.text;
-                        console.log('Received question from analyzer webview:', question);
-    
-                        // Get the current repository path dynamically
-                        const currentRepoPath = await getCurrentRepositoryPath();
-                        if (!currentRepoPath) {
-                            vscode.window.showErrorMessage("Could not determine the current Git repository path.");
-                            panel.webview.postMessage({ command: 'addErrorMessage', text: "Failed to find Git repository path." });
+                case 'askQuestion':
+                    const question = message.text;
+                    console.log(`Session ${sessionId}: Received question:`, question);
+
+                    const currentRepoPath = await getCurrentRepositoryPath();
+                    if (!currentRepoPath) {
+                        vscode.window.showErrorMessage("Could not determine the current Git repository path.");
+                        panel.webview.postMessage({ command: 'addErrorMessage', text: "Failed to find Git repository path." });
+                        return;
+                    }
+
+                    try {
+                        const response = await fetch(FASTAPI_URL, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'text/plain',
+                            },
+                            body: JSON.stringify({
+                                repo_path: currentRepoPath,
+                                query: question,
+                                session_id: sessionId 
+                            })
+                        });
+
+                        if (!response.ok) {
+                            const errorText = await response.text();
+                            console.error(`Session ${sessionId}: FastAPI request failed: ${response.status} ${response.statusText}`, errorText);
+                            panel.webview.postMessage({ command: 'addErrorMessage', text: `Server error (${response.status}): ${errorText || response.statusText}` });
                             return;
                         }
-    
-                        // --- Call FastAPI Backend ---
-                        try {
-                            // Dynamically import node-fetch because the extension uses CommonJS
-                            const fetch = (await import('node-fetch')).default;
-    
-                            const response = await fetch(FASTAPI_URL, {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                    'Accept': 'text/plain', // Expecting plain text stream
-                                },
-                                body: JSON.stringify({
-                                    repo_path: currentRepoPath,
-                                    query: question
-                                })
-                            });
-    
-                            if (!response.ok) {
-                                // Handle HTTP errors (like 4xx, 5xx)
-                                const errorText = await response.text();
-                                console.error(`FastAPI request failed: ${response.status} ${response.statusText}`, errorText);
-                                panel.webview.postMessage({ command: 'addErrorMessage', text: `Server error (${response.status}): ${errorText || response.statusText}` });
-                                return;
-                            }
-    
-                            if (!response.body) {
-                                console.error("FastAPI response body is null.");
-                                panel.webview.postMessage({ command: 'addErrorMessage', text: "Received empty response from server." });
-                                return;
-                            }
-    
-                            // Signal start of bot message stream
-                            panel.webview.postMessage({ command: 'startBotMessage' });
-    
-                            // --- FIX: Process the stream using for await...of ---
-                            const decoder = new TextDecoder();
-                            // Treat response.body as an AsyncIterable<Uint8Array> or Buffer
-                            for await (const chunkBuffer of response.body) {
-                                // Decode the chunk (assuming it's Uint8Array or Buffer)
-                                // If chunkBuffer is already string, skip decoding
-                                let chunkText: string;
-                                if (typeof chunkBuffer === 'string') {
-                                    chunkText = chunkBuffer;
-                                } else {
-                                    chunkText = decoder.decode(chunkBuffer, { stream: true });
-                                }
-                                // Send chunk to webview
-                                panel.webview.postMessage({ command: 'addBotChunk', text: chunkText });
-                            }
-                            // --- End FIX ---
 
-                            // Signal end of stream (optional, but good practice)
-                            // The decoder needs a final call in case there were partial multi-byte chars
-                            const finalChunk = decoder.decode();
-                            if (finalChunk) {
-                                panel.webview.postMessage({ command: 'addBotChunk', text: finalChunk });
-                            }
-                            panel.webview.postMessage({ command: 'endBotMessage' });
-    
-    
-                        } catch (error: any) {
-                            console.error("Error calling FastAPI backend:", error);
-                            let errorMessage = "Failed to connect to the analysis server.";
-                            if (error.code === 'ECONNREFUSED') {
-                                errorMessage += " Please ensure the backend server is running.";
-                            } else if (error instanceof Error) {
-                                errorMessage += ` (${error.message})`;
-                            }
-                            panel.webview.postMessage({ command: 'addErrorMessage', text: errorMessage });
+                        if (!response.body) {
+                            console.error(`Session ${sessionId}: FastAPI response body is null.`);
+                            panel.webview.postMessage({ command: 'addErrorMessage', text: "Received empty response from server." });
+                            return;
                         }
-                        // --- End Call FastAPI Backend ---
-                        return; 
 
-                case 'showError': // Allow webview to request showing errors
+                        panel.webview.postMessage({ command: 'startBotMessage' });
+
+                        const decoder = new TextDecoder();
+                        for await (const chunkBuffer of response.body) {
+                            let chunkText: string;
+                            if (typeof chunkBuffer === 'string') {
+                                chunkText = chunkBuffer;
+                            } else {
+                                // Ensure chunkBuffer is correctly typed
+                                chunkText = decoder.decode(chunkBuffer as Buffer | Uint8Array, { stream: true });
+                            }
+                            panel.webview.postMessage({ command: 'addBotChunk', text: chunkText });
+                        }
+
+                        const finalChunk = decoder.decode();
+                        if (finalChunk) {
+                            panel.webview.postMessage({ command: 'addBotChunk', text: finalChunk });
+                        }
+                        panel.webview.postMessage({ command: 'endBotMessage' });
+
+
+                    } catch (error: any) {
+                        console.error(`Session ${sessionId}: Error calling FastAPI backend:`, error);
+                        let errorMessage = "Failed to connect to the analysis server.";
+                        if (error.code === 'ECONNREFUSED') {
+                            errorMessage += " Please ensure the backend server is running.";
+                        } else if (error instanceof Error) {
+                            errorMessage += ` (${error.message})`;
+                        }
+                        panel.webview.postMessage({ command: 'addErrorMessage', text: errorMessage });
+                    }
+                    return;
+
+                case 'showError':
                     if (message.text) {
                         vscode.window.showErrorMessage(message.text);
                     }
@@ -163,76 +178,75 @@ export async function createOrShowAnalyzerWebview(context: vscode.ExtensionConte
 }
 
 
-function getAnalyzerWebviewHtml(context: vscode.ExtensionContext, webview: vscode.Webview): string {
-    const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(context.extensionUri, 'dist', 'webview', 'analyzerMain.js'));
-    const stylesUri = webview.asWebviewUri(vscode.Uri.joinPath(context.extensionUri, 'dist', 'webview', 'analyzerStyles.css'));
-    const codiconCssUri = webview.asWebviewUri(vscode.Uri.joinPath(context.extensionUri, 'node_modules', '@vscode', 'codicons', 'dist', 'codicon.css'));
-    const nonce = getNonce();
+function getAnalyzerWebviewHtml(context: vscode.ExtensionContext, webview: vscode.Webview): string { 
+     const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(context.extensionUri, 'dist', 'webview', 'analyzerMain.js'));
+     const stylesUri = webview.asWebviewUri(vscode.Uri.joinPath(context.extensionUri, 'dist', 'webview', 'analyzerStyles.css'));
+     const codiconCssUri = webview.asWebviewUri(vscode.Uri.joinPath(context.extensionUri, 'node_modules', '@vscode', 'codicons', 'dist', 'codicon.css'));
+     const nonce = getNonce();
 
-    const presetQuestions = [
-        "Who's the most frequent contributor?",
-        "Summarize the last change in the repository.",
-        "What are the Contributor insights?",
-        "Provide the Commit-Message Quality based on days of the week",
-        "Give me the Recent activity / cadence",
-        "Provide me the Risk & quality signals of the repository",
-        "Give the Ownership & bus-factor of files"
-        
-    ];
+     const presetQuestions = [
+         "Who's the most frequent contributor?",
+         "Summarize the last change in the repository.",
+         "What are the Contributor insights?",
+         "Provide the Commit-Message Quality based on days of the week",
+         "Give me the Recent activity / cadence",
+         "Provide me the Risk & quality signals of the repository",
+         "Give the Ownership & bus-factor of files"
 
-    let questionsHtml = '';
-    presetQuestions.forEach(q => {
-        // Escape the question text properly for the data attribute
-        const escapedQ = q.replace(/"/g, "&quot;").replace(/'/g, "&#039;");
-        questionsHtml += `<button class="preset-question-button" data-question="${escapedQ}">${q}</button>\n`;
-    });
+     ];
 
-    return `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="
-        default-src 'none';
-        style-src ${webview.cspSource} 'unsafe-inline';
-        font-src ${webview.cspSource};
-        img-src ${webview.cspSource} https: data:;
-        script-src 'nonce-${nonce}';
-    ">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link href="${codiconCssUri}" rel="stylesheet" nonce="${nonce}" />
-    <link href="${stylesUri}" rel="stylesheet" nonce="${nonce}">
-    <title>Git Repository Analyzer</title>
-</head>
-<body>
-    <div class="analyzer-container">
-        <aside class="sidebar">
-            <h2>FAQs</h2>
-            <div class="preset-questions">
-                ${questionsHtml}
-            </div>
-        </aside>
+     let questionsHtml = '';
+     presetQuestions.forEach(q => {
+         const escapedQ = q.replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+         questionsHtml += `<button class="preset-question-button" data-question="${escapedQ}">${q}</button>\n`;
+     });
 
-        <main class="chat-area">
-            <div id="message-list" class="message-list">
-                 <div class="message bot-message">
-                    <span class="codicon codicon-hubot avatar"></span>
-                    <div class="content">
-                        <p>👋 Welcome to the Git Repository Assistant! I can help you analyze and understand the current repository.</p>
-                        <p>Select a question from the sidebar or ask me anything about the current git repository.</p>
-                    </div>
-                 </div>
-                 </div>
+     return `<!DOCTYPE html>
+ <html lang="en">
+ <head>
+     <meta charset="UTF-8">
+     <meta http-equiv="Content-Security-Policy" content="
+         default-src 'none';
+         style-src ${webview.cspSource} 'unsafe-inline';
+         font-src ${webview.cspSource};
+         img-src ${webview.cspSource} https: data:;
+         script-src 'nonce-${nonce}';
+     ">
+     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+     <link href="${codiconCssUri}" rel="stylesheet" nonce="${nonce}" />
+     <link href="${stylesUri}" rel="stylesheet" nonce="${nonce}">
+     <title>Git Repository Analyzer</title>
+ </head>
+ <body>
+     <div class="analyzer-container">
+         <aside class="sidebar">
+             <h2>FAQs</h2>
+             <div class="preset-questions">
+                 ${questionsHtml}
+             </div>
+         </aside>
 
-            <div class="input-area">
-                <textarea id="question-input" placeholder="Ask me anything about the current git repository..." rows="1"></textarea>
-                <button id="send-button" title="Send Message">
-                    <span class="codicon codicon-send"></span>
-                </button>
-            </div>
-        </main>
-    </div>
+         <main class="chat-area">
+             <div id="message-list" class="message-list">
+                  <div class="message bot-message">
+                     <span class="codicon codicon-hubot avatar"></span>
+                     <div class="content">
+                         <p>👋 Welcome to the Git Repository Assistant! I can help you analyze and understand the current repository.</p>
+                         <p>Select a question from the sidebar or ask me anything about the current git repository.</p>
+                     </div>
+                  </div>
+                  </div>
 
-    <script nonce="${nonce}" src="${scriptUri}"></script>
-</body>
-</html>`;
+             <div class="input-area">
+                 <textarea id="question-input" placeholder="Ask me anything about the current git repository..." rows="1"></textarea>
+                 <button id="send-button" title="Send Message">
+                     <span class="codicon codicon-send"></span>
+                 </button>
+             </div>
+         </main>
+     </div>
+
+     <script nonce="${nonce}" src="${scriptUri}"></script>
+ </body>
+ </html>`;
 }
