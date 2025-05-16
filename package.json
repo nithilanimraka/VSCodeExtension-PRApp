@@ -14,12 +14,14 @@
   ],
   "activationEvents": [
     "onView:yourPrViewId",
+    "onView:yourCreatePrViewId",
     "onCommand:yourExtension.analyzeRepository",
     "onCommand:yourExtension.showCreatePullRequestView",
     "onCommand:yourExtension.refreshPrView",
     "onCommand:yourExtension.viewPullRequest",
     "onCommand:yourExtension.viewSpecificFileDiff",
-    "onAuthenticationRequest:github"
+    "onAuthenticationRequest:github",
+    "onCommand:yourExtension.showReviewResults"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -59,7 +61,8 @@
       },
       {
         "command": "yourExtension.analyzeRepository",
-        "title": "Analyze Git Repository"
+        "title": "Analyze Git Repository",
+        "icon": "$(beaker)"
       }
     ],
     "menus": {
@@ -70,12 +73,15 @@
           "group": "navigation@0"
         },
         {
-          "command": "yourExtension.showCreatePullRequestView",
-          "when": "view == yourPrViewId",
-          "group": "navigation@1"
+            "command": "yourExtension.showCreatePullRequestView",
+            "when": "view == yourPrViewId",
+            "group": "navigation@1"
         }
+
       ],
-      "view/item/context": []
+      "view/item/context": [
+
+      ]
     },
     "views": {
       "your-pr-activitybar": [
@@ -90,12 +96,13 @@
           "type": "webview",
           "when": "yourExtension:createPrViewVisible"
         }
+      
       ]
     }
   },
   "scripts": {
     "vscode:prepublish": "npm run esbuild-base -- --minify",
-    "esbuild-base": "esbuild ./src/extension.ts ./src/webview/main.ts ./src/webview/styles.css ./src/webview/createPrMain.ts ./src/webview/createPrStyles.css ./src/webview/analyzerMain.ts ./src/webview/analyzerStyles.css --bundle --external:vscode --format=cjs --platform=node --outdir=dist/ --entry-names=[dir]/[name] --outbase=src",
+    "esbuild-base": "esbuild ./src/extension.ts ./src/webview/main.ts ./src/webview/styles.css ./src/webview/createPrMain.ts ./src/webview/createPrStyles.css ./src/webview/analyzerMain.ts ./src/webview/analyzerStyles.css ./src/webview/reviewResultMain.ts ./src/webview/reviewResultStyles.css --bundle --external:vscode --format=cjs --platform=node --outdir=dist/ --entry-names=[dir]/[name] --outbase=src",
     "build": "npm run esbuild-base -- --sourcemap",
     "watch": "npm run esbuild-base -- --sourcemap --watch",
     "pretest": "npm run build && npm run lint",
@@ -106,6 +113,9 @@
     "@types/mocha": "^10.0.10",
     "@types/node": "20.x",
     "@types/vscode": "^1.98.0",
+    "@types/node-fetch": "^2.6.12", 
+    "@types/uuid": "^9.0.8", 
+    "@types/markdown-it": "^14.1.2", 
     "@typescript-eslint/eslint-plugin": "^8.28.0",
     "@typescript-eslint/parser": "^8.28.0",
     "@vscode/codicons": "^0.0.36",
@@ -116,11 +126,9 @@
     "typescript": "^5.8.2"
   },
   "dependencies": {
-    "@octokit/rest": "^18.12.0",
-    "@types/markdown-it": "^14.1.2",
-    "@types/node-fetch": "^2.6.12",
+    "@octokit/rest": "^18.12.0", 
     "markdown-it": "^14.1.0",
-    "node-fetch": "^3.3.2",
-    "uuid": "^11.1.0"
+    "node-fetch": "^3.3.2", 
+    "uuid": "^11.1.0" 
   }
 }
