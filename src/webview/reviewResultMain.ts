@@ -29,11 +29,9 @@ declare const hljs: any; // Declare highlight.js library if loaded globally via 
 
     // --- Helper to parse line prefix ---
     function parseLinePrefix(prefix: string | undefined | null): { num: number; sign: '+' | '-' | ' ' } {
-        // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< FIX START >>>>>>>>>>>>>>>>>>>>>>>>>>>>
         if (!prefix) {
             return { num: 0, sign: ' ' };
         }
-        // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< FIX END >>>>>>>>>>>>>>>>>>>>>>>>>>>>
         const sign = prefix.startsWith('+') ? '+' : prefix.startsWith('-') ? '-' : ' ';
         const numStr = prefix.replace(/^[+-]/, '').trim();
         const num = parseInt(numStr, 10);
@@ -87,14 +85,9 @@ declare const hljs: any; // Declare highlight.js library if loaded globally via 
                     currentLineNum++; // Increment for next added/context line
                 } else if (trimmedLine.startsWith('-')) {
                     lineDiv.classList.add('line-removed');
-                    // For removed lines, we might still want to show the original number
-                    // If the backend parsing logic ensures this maps correctly, use currentLineNum
-                    // For simplicity, let's just use the *previous* line number concept here,
-                    // assuming the diff context is somewhat sequential.
-                    // A more robust solution might need the backend to track both old/new numbers.
-                    numSpan.textContent = String(currentLineNum); // Show number of line it replaced/came before
+
+                    numSpan.textContent = String(currentLineNum); 
                     contentSpan.textContent = line; // Keep prefix
-                    // DO NOT increment currentLineNum for removed lines
                 } else {
                     lineDiv.classList.add('line-context');
                     numSpan.textContent = String(currentLineNum);
@@ -112,7 +105,7 @@ declare const hljs: any; // Declare highlight.js library if loaded globally via 
             itemDiv.appendChild(codeSegmentDiv);
         }
 
-        // --- Analysis Box (Issue, Severity, Suggestion) ---
+        
         const analysisBox = document.createElement('div');
         analysisBox.className = 'review-analysis';
         const issueP = document.createElement('p');
@@ -125,7 +118,7 @@ declare const hljs: any; // Declare highlight.js library if loaded globally via 
         suggestionP.innerHTML = `<strong>Suggestion:</strong> ${escapeHtml(review.suggestion)}`;
         analysisBox.appendChild(suggestionP);
 
-        // --- Suggested Code (if available) ---
+        
         if (review.suggestedCode) {
             const suggestedCodeDiv = document.createElement('div');
             suggestedCodeDiv.className = 'review-suggested-code';
@@ -187,10 +180,6 @@ declare const hljs: any; // Declare highlight.js library if loaded globally via 
                             reviewListContainer.querySelectorAll('.review-suggested-code pre code').forEach((block) => {
                                 hljs.highlightElement(block as HTMLElement);
                             });
-                           // Optionally highlight original code segment (might have issues with diff markers)
-                           // reviewListContainer.querySelectorAll('.review-code-segment pre code').forEach((block) => {
-                           //     hljs.highlightElement(block as HTMLElement);
-                           // });
                        } catch (e) {
                            console.error("Highlight.js error:", e);
                        }
