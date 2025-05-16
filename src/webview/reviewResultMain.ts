@@ -7,7 +7,13 @@ declare const hljs: any; // Declare highlight.js library if loaded globally via 
 (function () {
     const vscode = acquireVsCodeApi();
     const reviewListContainer = document.getElementById('review-list-container');
-
+    const exportMdButton = document.getElementById('export-md-button');
+    
+    if (exportMdButton) {
+        exportMdButton.addEventListener('click', () => {
+            vscode.postMessage({ command: 'exportMarkdown' });
+        });
+    }
     // --- Helper Functions ---
     function escapeHtml(unsafe: unknown): string {
         if (typeof unsafe !== 'string') {

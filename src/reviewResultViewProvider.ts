@@ -2,6 +2,8 @@
 import * as vscode from 'vscode';
 import { getNonce } from './utils'; // Assuming utils.ts exists and exports getNonce
 import type { ReviewItemData } from './types'; // Import the review structure type
+import * as fs from 'fs';
+import * as path from 'path';
 
 // Type for messages sent TO this webview
 type ToReviewResultWebviewMessage =
@@ -18,6 +20,91 @@ let reviewResultPanel: vscode.WebviewPanel | undefined = undefined;
  * @param baseBranch Optional base branch name for the panel title.
  * @param headBranch Optional head branch name for the panel title.
  */
+
+// Add this function to convert review data to markdown
+function convertReviewToMarkdown(reviewData: ReviewItemData[]): string {
+    let markdown = `# Code Review Results\n\n`;
+    
+    reviewData.forEach((review, index) => {
+        markdown += `## ${index + 1}. ${review.fileName || 'Unknown File'}\n`;
+        
+        // Line numbers
+        const startLineInfo = parseLinePrefix(review.start_line_with_prefix);
+        const endLineInfo = parseLinePrefix(review.end_line_with_prefix);
+        const lineRangeStr = startLineInfo.num === endLineInfo.num
+            ? `${startLineInfo.sign}${startLineInfo.num}`
+            : `${startLineInfo.sign}${startLineInfo.num} to ${endLineInfo.sign}${endLineInfo.num}`;
+        
+        markdown += `**Lines:** ${lineRangeStr}\n\n`;
+        
+        // Issue details
+        markdown += `### Issue\n${review.issue}\n\n`;
+        markdown += `**Severity:** ${review.severity}\n\n`;
+        
+        // Code segment
+        if (review.codeSegmentToFix) {
+            markdown += `### Original Code\n\`\`\`${review.language || ''}\n${review.codeSegmentToFix}\n\`\`\`\n\n`;
+        }
+        
+        // Suggestion
+        markdown += `### Suggestion\n${review.suggestion}\n\n`;
+        
+        // Suggested code
+        if (review.suggestedCode) {
+            markdown += `### Suggested Code\n\`\`\`${review.language || ''}\n${review.suggestedCode}\n\`\`\`\n\n`;
+        }
+        
+        markdown += `---\n\n`;
+    });
+    
+    return markdown;
+}
+
+function parseLinePrefix(prefix: string | undefined | null): { num: number; sign: '+' | '-' | ' ' } {
+    if (!prefix) {
+        return { num: 0, sign: ' ' };
+    }
+    const sign = prefix.startsWith('+') ? '+' : prefix.startsWith('-') ? '-' : ' ';
+    const numStr = prefix.replace(/^[+-]/, '').trim();
+    const num = parseInt(numStr, 10);
+    return { num: isNaN(num) ? 0 : num, sign };
+}
+
+async function exportReviewAsMarkdown(reviewData: ReviewItemData[], context: vscode.ExtensionContext) {
+    try {
+        // Get workspace folder
+        const workspaceFolders = vscode.workspace.workspaceFolders;
+        if (!workspaceFolders || workspaceFolders.length === 0) {
+            vscode.window.showErrorMessage('No workspace folder found to save the markdown file.');
+            return;
+        }
+
+        // Ask user for file location
+        const uri = await vscode.window.showSaveDialog({
+            defaultUri: vscode.Uri.joinPath(workspaceFolders[0].uri, 'code-review-results.md'),
+            filters: {
+                'Markdown': ['md']
+            },
+            title: 'Save Code Review as Markdown'
+        });
+
+        if (!uri) {
+            return; // User cancelled
+        }
+
+        // Convert to markdown
+        const markdownContent = convertReviewToMarkdown(reviewData);
+
+        // Write file
+        await vscode.workspace.fs.writeFile(uri, Buffer.from(markdownContent));
+        
+        vscode.window.showInformationMessage(`Code review saved as Markdown: ${uri.fsPath}`);
+    } catch (error) {
+        console.error('Error exporting markdown:', error);
+        vscode.window.showErrorMessage('Failed to export code review as Markdown.');
+    }
+}
+
 export function createOrShowReviewResultPanel(
     context: vscode.ExtensionContext,
     reviewData: ReviewItemData[],
@@ -73,6 +160,9 @@ export function createOrShowReviewResultPanel(
                     console.log('Review Result Webview signaled ready. Posting initial data.');
                     // Send the review data ONLY after the webview confirms it's ready
                     reviewResultPanel?.webview.postMessage({ command: 'showReviewResults', data: reviewData });
+                    return;
+                case 'exportMarkdown':
+                    exportReviewAsMarkdown(reviewData, context);
                     return;
                 // Handle other messages from the webview if needed (e.g., copy clicks, links)
                 // case 'copyCode':
@@ -134,8 +224,12 @@ function getReviewResultWebviewHtml(context: vscode.ExtensionContext, webview: v
     </head>
     <body>
         <h1>AI Code Review Results</h1>
+        <button id="export-md-button" class="export-button">
+                <span class="codicon codicon-markdown"></span> Export as Markdown
+            </button>
         <div id="review-list-container">
             <p>Loading review...</p> </div>
+            
 
         <script nonce="${nonce}" src="${highlightScriptUri}"></script>
         <script nonce="${nonce}" src="${scriptUri}"></script>

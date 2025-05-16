@@ -186,3 +186,29 @@ pre code.hljs {
     background: transparent; /* Use parent pre's background */
     color: var(--vscode-editor-foreground); /* Use theme foreground */
 }
+
+
+.header-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.export-button {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background-color: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
+    border: none;
+    border-radius: 2px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    margin-bottom: 1rem;
+}
+
+.export-button:hover {
+    background-color: var(--vscode-button-hoverBackground);
+}
