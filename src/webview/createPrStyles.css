@@ -1,58 +1,47 @@
+/* src/webview/createPrStyles.css */
 body {
     padding: 10px 15px;
     font-family: var(--vscode-font-family);
     font-size: var(--vscode-font-size);
     color: var(--vscode-foreground);
-    background-color: var(--vscode-sideBar-background);
+    background-color: var(--vscode-sideBar-background); /* Use sidebar bg */
     height: 100vh;
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
 }
 
+/* Main form container */
 .create-pr-form {
     display: flex;
     flex-direction: column;
-    gap: 15px; /* Space between form groups */
+    gap: 10px; /* Consistent gap between groups */
     flex-grow: 1; /* Allow form to grow */
-    overflow-y: auto; /* Add scroll if form content is long */
+    overflow-y: auto; /* Add scroll if needed */
+    padding-bottom: 10px; /* Space before bottom buttons */
 }
 
-h2 {
-    margin: 0 0 10px 0;
-    padding: 0;
-    font-size: 1.1em;
-    font-weight: bold;
-    border-bottom: 1px solid var(--vscode-editorWidget-border, #444);
-    padding-bottom: 5px;
-}
 
+/* Common form group styling */
 .form-group {
     display: flex;
     flex-direction: column;
     gap: 5px; /* Space between label and input */
+    margin-bottom: 10px; /* Consistent margin below groups */
 }
 
 label {
     font-weight: bold;
     font-size: 0.95em;
     color: var(--vscode-descriptionForeground);
+    display: block;
+    margin-bottom: 3px;
 }
 
-/* Input and Textarea using VS Code styles */
+/* Input, Textarea, Select using VS Code styles */
 input[type="text"],
-textarea {
-    font-family: var(--vscode-font-family);
-    font-size: var(--vscode-font-size);
-    color: var(--vscode-input-foreground);
-    background-color: var(--vscode-input-background);
-    border: 1px solid var(--vscode-input-border, var(--vscode-editorWidget-border));
-    border-radius: 2px;
-    padding: 4px 6px;
-}
-
+textarea,
 select {
-    /* Apply standard VS Code input styling variables */
     font-family: var(--vscode-font-family);
     font-size: var(--vscode-font-size);
     color: var(--vscode-input-foreground);
@@ -60,24 +49,11 @@ select {
     border: 1px solid var(--vscode-input-border, var(--vscode-editorWidget-border));
     border-radius: 2px;
     padding: 4px 6px;
-
-    /* Add dropdown arrow styling if needed (can be tricky cross-browser) */
-    /* appearance: none; */ /* May be needed to remove default arrow before adding custom one */
+    width: 100%;
+    box-sizing: border-box;
 }
 
-select:focus {
-    outline: 1px solid var(--vscode-focusBorder);
-    outline-offset: -1px;
-    border-color: var(--vscode-focusBorder);
-}
-
-input[readonly] {
-     background-color: var(--vscode-input-background); /* Or slightly different bg */
-     opacity: 0.7;
-     cursor: default;
-}
-
-
+select:focus,
 input[type="text"]:focus,
 textarea:focus {
     outline: 1px solid var(--vscode-focusBorder);
@@ -86,136 +62,147 @@ textarea:focus {
 }
 
 textarea {
-    resize: vertical; /* Allow vertical resize */
+    resize: vertical;
     min-height: 60px;
 }
 
+select:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
 
-/* Files List */
+h2 {
+    margin: 10px 0 10px 0;
+    padding: 0;
+    font-size: 1.1em;
+    font-weight: bold;
+    border-bottom: 1px solid var(--vscode-editorWidget-border, #444);
+    padding-bottom: 5px;
+}
+
+/* Files List Styling */
 .files-list {
-    max-height: 200px; /* Adjust height as needed */
+    max-height: 150px;
     overflow-y: auto;
     border: 1px solid var(--vscode-input-border, var(--vscode-editorWidget-border));
     border-radius: 2px;
     padding: 5px;
     background-color: var(--vscode-input-background);
+    /* margin-bottom: 5px; */ /* Removed margin, handled by form-group */
 }
-.files-list p { /* Style for 'No changes' message */
+.files-list p {
     margin: 0;
     padding: 5px;
     font-style: italic;
     color: var(--vscode-descriptionForeground);
 }
-
-/* Style the UL inside the list */
 .file-list-ul {
     list-style: none;
     padding: 0;
     margin: 0;
 }
-
-/* Style each List Item using Flexbox */
 .file-list-item {
     display: flex;
     align-items: center;
-    gap: 6px; /* Space between icon, name, status */
+    gap: 6px;
     padding: 3px 4px;
-    font-size: var(--vscode-font-size); /* Use standard editor font size */
-    border-radius: 2px; /* Optional: subtle rounding on hover */
+    font-size: var(--vscode-font-size);
+    border-radius: 2px;
 }
-.file-list-item:hover {
-     background-color: var(--vscode-list-hoverBackground); /* Subtle hover */
+.file-list-item.clickable-file {
+    cursor: pointer;
 }
-
-
-/* Style the File Icon */
-.file-icon {
-    /* Inherit color or set explicitly */
-    /* color: var(--vscode-icon-foreground); */
-    flex-shrink: 0; /* Prevent icon from shrinking */
-    /* font-size: 1.1em; */ /* Adjust size if needed */
+.file-list-item.clickable-file:hover {
+    background-color: var(--vscode-list-hoverBackground);
+    color: var(--vscode-list-hoverForeground);
 }
-
-/* Style the File Path */
+.file-list-item.clickable-file:hover .file-path {
+    color: inherit;
+}
+.file-list-item.clickable-file:focus {
+    outline: 1px solid var(--vscode-focusBorder);
+    outline-offset: -1px;
+    background-color: var(--vscode-list-focusBackground);
+}
+.file-icon { flex-shrink: 0; }
 .file-path {
-    flex-grow: 1; /* Allow path to take up available space */
+    flex-grow: 1;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    /* color: var(--vscode-foreground); */ /* Default text color */
 }
-
-/* Style the File Path based on parent LI status class */
-.file-list-item.status-a .file-path {
-    color: var(--vscode-gitDecoration-addedResourceForeground);
-}
-.file-list-item.status-m .file-path {
-    color: var(--vscode-gitDecoration-modifiedResourceForeground);
-}
-.file-list-item.status-d .file-path {
-    color: var(--vscode-gitDecoration-deletedResourceForeground);
-}
-.file-list-item.status-r .file-path {
-    color: var(--vscode-gitDecoration-renamedResourceForeground);
-}
-.file-list-item.status-c .file-path {
-    color: var(--vscode-gitDecoration-submoduleResourceForeground); 
-}
-.file-list-item.status-\? .file-path { 
-    color: var(--vscode-gitDecoration-untrackedResourceForeground);
-}
-
-.file-list-item.status-i .file-path {
-    color: var(--vscode-gitDecoration-ignoredResourceForeground);
-} 
-
-.file-list-item.status-conflict .file-path {
-    color: var(--vscode-gitDecoration-conflictingResourceForeground);
-} 
-
-/* Style the Status Character (right-aligned) */
 .file-status {
     font-family: var(--vscode-editor-font-family);
     font-weight: bold;
-    padding: 1px 5px; /* Adjust padding */
-    border-radius: 3px; /* More rounded */
+    padding: 1px 5px;
+    border-radius: 3px;
     font-size: 0.9em;
     text-align: center;
-    margin-left: auto; /* Pushes status to the far right in flex container */
-    flex-shrink: 0; /* Prevent status from shrinking */
-    min-width: 1.8em; /* Ensure minimum width for alignment */
+    margin-left: auto;
+    flex-shrink: 0;
+    min-width: 1.8em;
 }
-/* Colors using more standard VS Code Git decoration variables */
-.file-status-a { color: var(--vscode-gitDecoration-addedResourceForeground); }
-.file-status-m { color: var(--vscode-gitDecoration-modifiedResourceForeground); }
-.file-status-d { color: var(--vscode-gitDecoration-deletedResourceForeground); }
-.file-status-r { color: var(--vscode-gitDecoration-renamedResourceForeground); }
-.file-status-c { color: var(--vscode-gitDecoration-submoduleResourceForeground); } /* Copied isn't standard git, using submodule */
-.file-status-\? { color: var(--vscode-gitDecoration-untrackedResourceForeground); }
-/* Remove background colors if you just want text color like screenshot */
-/* Background versions (keep if preferred):
-.file-status-a { color: var(--vscode-gitDecoration-addedResourceForeground); background-color: rgba(47, 131, 47, 0.15); }
-.file-status-m { color: var(--vscode-gitDecoration-modifiedResourceForeground); background-color: rgba(188, 76, 0, 0.15); }
-.file-status-d { color: var(--vscode-gitDecoration-deletedResourceForeground); background-color: rgba(171, 41, 41, 0.15); }
-.file-status-r { color: var(--vscode-gitDecoration-renamedResourceForeground); background-color: rgba(58, 106, 173, 0.15); }
-.file-status-c { color: var(--vscode-gitDecoration-submoduleResourceForeground); background-color: rgba(100, 100, 100, 0.15); }
-.file-status-? { color: var(--vscode-gitDecoration-untrackedResourceForeground); background-color: rgba(117, 185, 56, 0.15); }
-*/
+/* Status Colors */
+.file-list-item.status-a .file-path, .file-status-a { color: var(--vscode-gitDecoration-addedResourceForeground); }
+.file-list-item.status-m .file-path, .file-status-m { color: var(--vscode-gitDecoration-modifiedResourceForeground); }
+.file-list-item.status-d .file-path, .file-status-d { color: var(--vscode-gitDecoration-deletedResourceForeground); }
+.file-list-item.status-r .file-path, .file-status-r { color: var(--vscode-gitDecoration-renamedResourceForeground); }
+.file-list-item.status-c .file-path, .file-status-c { color: var(--vscode-gitDecoration-submoduleResourceForeground); }
+.file-list-item.status-\? .file-path, .file-status-\? { color: var(--vscode-gitDecoration-untrackedResourceForeground); }
+.file-list-item.status-i .file-path, .file-status-i { color: var(--vscode-gitDecoration-ignoredResourceForeground); }
+.file-list-item.status-conflict .file-path, .file-status-conflict { color: var(--vscode-gitDecoration-conflictingResourceForeground); }
 
 
-/* Button Group */
-.button-group {
+/* Code Review Button Group */
+.code-review-button-group {
+    margin-top: 5px; /* Add some space above the button */
+    margin-bottom: 15px; /* Space below before the final buttons */
+}
+
+/* Code Review Button Styling */
+#code-review-button {
+    background-color: var(--vscode-button-background); /* Or a distinct color like blue */
+    /* background-color: #007ACC; */ /* Example blue */
+    color: var(--vscode-button-foreground);
+    border: 1px solid var(--vscode-button-border, transparent);
+    padding: 8px 12px; /* Slightly larger padding */
+    border-radius: 2px;
+    cursor: pointer;
+    width: 100%; /* Full width */
+    text-align: center;
+    font-weight: bold;
+}
+#code-review-button:hover {
+    background-color: var(--vscode-button-hoverBackground);
+    /* background-color: #005A9E; */ /* Darker blue on hover */
+}
+#code-review-button:focus {
+    outline: 1px solid var(--vscode-focusBorder);
+    outline-offset: 1px;
+}
+#code-review-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background-color: var(--vscode-button-background); /* Keep base color */
+}
+#code-review-button:disabled:hover {
+    background-color: var(--vscode-button-background); /* Prevent hover effect */
+}
+
+
+/* Bottom Button Group Styling */
+.button-group.bottom-buttons {
     display: flex;
     gap: 10px;
     justify-content: flex-end; /* Align buttons to the right */
-    margin-top: auto; /* Push buttons to the bottom */
-    padding-top: 15px; /* Add space above buttons */
+    margin-top: auto; /* Push this group to the bottom */
+    padding-top: 15px;
     border-top: 1px solid var(--vscode-editorWidget-border, #444);
 }
 
-/* Use standard button styles */
-#cancel-button,
-#create-button {
+/* Specific Button Styling (Cancel, Create) */
+#create-button,
+#cancel-button {
     background-color: var(--vscode-button-background);
     color: var(--vscode-button-foreground);
     border: 1px solid var(--vscode-button-border, transparent);
@@ -225,17 +212,27 @@ textarea {
     min-width: 80px;
     text-align: center;
 }
-#cancel-button:hover,
-#create-button:hover {
+#create-button:hover,
+#cancel-button:hover {
     background-color: var(--vscode-button-hoverBackground);
 }
-#cancel-button:focus,
-#create-button:focus {
-     outline: 1px solid var(--vscode-focusBorder);
-     outline-offset: 1px;
+#create-button:focus,
+#cancel-button:focus {
+    outline: 1px solid var(--vscode-focusBorder);
+    outline-offset: 1px;
 }
 
-/* Optional: Style Cancel button differently (secondary) */
+/* Disabled state for Create button */
+#create-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background-color: var(--vscode-button-background); /* Keep base color */
+}
+#create-button:disabled:hover {
+    background-color: var(--vscode-button-background); /* Prevent hover effect */
+}
+
+/* Cancel Button (Secondary Style) */
 #cancel-button {
     background-color: var(--vscode-button-secondaryBackground);
     color: var(--vscode-button-secondaryForeground);
@@ -245,24 +242,10 @@ textarea {
     background-color: var(--vscode-button-secondaryHoverBackground);
 }
 
-/* Style clickable file items */
-.file-list-item.clickable-file {
-    cursor: pointer; /* Hand cursor on hover */
-    border-radius: 2px;
-}
-
-.file-list-item.clickable-file:hover {
-    background-color: var(--vscode-list-hoverBackground); /* Use standard hover */
-    color: var(--vscode-list-hoverForeground);
-}
- /* Ensure path color doesn't get overridden on hover by default link styles */
- .file-list-item.clickable-file:hover .file-path {
-     color: inherit; /* Inherit color from parent li on hover */
- }
-
-
-.file-list-item.clickable-file:focus {
-     outline: 1px solid var(--vscode-focusBorder); /* Focus outline for accessibility */
-     outline-offset: -1px;
-     background-color: var(--vscode-list-focusBackground);
+/* Waiting message styling */
+#waiting-message {
+    padding: 15px;
+    text-align: center;
+    color: var(--vscode-descriptionForeground);
+    display: none; /* Hidden by default */
 }
