@@ -1,8 +1,7 @@
-// In extension.ts or a separate auth.ts file
 import * as vscode from 'vscode';
 
 const GITHUB_AUTH_PROVIDER_ID = 'github';
-// Define the scopes needed for your extension. Adjust as necessary.
+// Define the scopes needed for your extension.
 // 'repo' scope is essential for accessing repository data, including PRs.
 const SCOPES = ['repo', 'read:user'];
 

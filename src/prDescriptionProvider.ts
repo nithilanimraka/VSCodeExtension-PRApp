@@ -426,7 +426,7 @@ export async function fetchPrTimelineData(octokit: Octokit, prInfo: PullRequestI
         // Add commits
         commitsResponse.data.forEach(item => {
              if(item.commit.author?.date) {
-                 timelineItems.push({ type: 'commit', data: item, timestamp: new Date(item.commit.author.date) })
+                 timelineItems.push({ type: 'commit', data: item, timestamp: new Date(item.commit.author.date) });
              }
         });
 

@@ -1,7 +1,8 @@
 import * as vscode from 'vscode';
-import { getOctokit } from './auth'; 
-import { Octokit } from '@octokit/rest'; 
+import { getOctokit } from './auth';
+import { Octokit } from '@octokit/rest';
 import type { Endpoints } from "@octokit/types";
+import { isGitRepositoryAvailable } from './gitUtils';
 
 // Type for file objects from listFiles endpoint
 type ChangedFileFromApi = Endpoints["GET /repos/{owner}/{repo}/pulls/{pull_number}/files"]["response"]["data"][0];
@@ -56,6 +57,8 @@ export class PrDataProvider implements vscode.TreeDataProvider<vscode.TreeItem> 
 
     async getChildren(element?: vscode.TreeItem): Promise<vscode.TreeItem[]> {
 
+        const gitAvailable = await isGitRepositoryAvailable();
+
         if (!this.octokit || !this.currentUser) {
              const signInItem = new vscode.TreeItem("Sign in to GitHub");
              signInItem.command = {
@@ -65,9 +68,25 @@ export class PrDataProvider implements vscode.TreeDataProvider<vscode.TreeItem> 
              return [signInItem];
         }
 
-        if (element instanceof PullRequestItem) { 
-            // Return children for an expanded PullRequestItem
+        // Root level items (no parent element)
+        if (!element) {
+             
+            // Create the "Analyze Git Repository" 
+            const analyzeItem = await this.createAnalyzeRepoTreeItem(gitAvailable);
 
+            // Original category items
+            const categories: vscode.TreeItem[] = [
+                new CategoryItem("Waiting For My Review", vscode.TreeItemCollapsibleState.Collapsed),
+                new CategoryItem("Assigned To Me", vscode.TreeItemCollapsibleState.Collapsed),
+                new CategoryItem("Created By Me", vscode.TreeItemCollapsibleState.Collapsed),
+                new CategoryItem("All Open", vscode.TreeItemCollapsibleState.Collapsed)
+            ];
+
+            // Return the analyze item first, then the categories
+            return Promise.resolve([analyzeItem, ...categories]);
+
+        } else if (element instanceof PullRequestItem) {
+            // Return children for an expanded PullRequestItem
             if (!element.filesFetched) {
                 // Fetch files if not already fetched
                 try {
@@ -75,7 +94,7 @@ export class PrDataProvider implements vscode.TreeDataProvider<vscode.TreeItem> 
                         owner: element.prInfo.repoOwner,
                         repo: element.prInfo.repoName,
                         pull_number: element.prInfo.number,
-                        per_page: 300 
+                        per_page: 300
                     });
                     element.changedFiles = response.data;
                     element.filesFetched = true;
@@ -86,9 +105,9 @@ export class PrDataProvider implements vscode.TreeDataProvider<vscode.TreeItem> 
                      return [new vscode.TreeItem("Error fetching changed files")];
                 }
             }
-    
+
             // Create child items if files were fetched successfully
-            const children: vscode.TreeItem[] = [new DescriptionItem(element.prInfo)]; 
+            const children: vscode.TreeItem[] = [new DescriptionItem(element.prInfo)];
             if (element.changedFiles && element.changedFiles.length > 0) {
                 element.changedFiles.forEach(file => {
                     children.push(new ChangedFileItem(element.prInfo, file));
@@ -97,31 +116,46 @@ export class PrDataProvider implements vscode.TreeDataProvider<vscode.TreeItem> 
                  // If fetched but no files found
                  children.push(new vscode.TreeItem("No changed files found", vscode.TreeItemCollapsibleState.None));
             }
-    
+
             return children;
-    
-        } else if (element instanceof CategoryItem) { 
+
+        } else if (element instanceof CategoryItem) {
             // Existing logic for categories
             if (element.label) {
                  return this.getPullRequestsForCategory(element.label as string);
             }
             return [];
-        } else if (!element) {
-            // Existing logic for root level (categories)
-             const categories: vscode.TreeItem[] = [ 
-                new CategoryItem("Waiting For My Review", vscode.TreeItemCollapsibleState.Collapsed),
-                new CategoryItem("Assigned To Me", vscode.TreeItemCollapsibleState.Collapsed),
-                new CategoryItem("Created By Me", vscode.TreeItemCollapsibleState.Collapsed),
-                new CategoryItem("All Open", vscode.TreeItemCollapsibleState.Collapsed)
-            ];
-            return Promise.resolve(categories);
-
         } else {
              return [];
         }
     }
 
+    // Function to create the Analyze Repo Tree Item
+    private async createAnalyzeRepoTreeItem(gitAvailable: boolean): Promise<vscode.TreeItem> {
+        const analyzeItem = new vscode.TreeItem("Analyze Git Repository", vscode.TreeItemCollapsibleState.None);
+        analyzeItem.iconPath = new vscode.ThemeIcon('beaker', new vscode.ThemeColor('gitDecoration.addedResourceForeground')); 
+        analyzeItem.contextValue = 'analyzeRepoAction'; // Optional context value
+
+        if (gitAvailable) {
+            analyzeItem.tooltip = "Run analysis on the current Git repository";
+            analyzeItem.command = {
+                command: 'yourExtension.analyzeRepository', // Command to be triggered
+                title: "Analyze Git Repository",
+                arguments: [] 
+            };
+        } else {
+            analyzeItem.tooltip = "Requires an initialized Git repository in the workspace";
+            analyzeItem.description = "(No Git repo found)"; 
+        }
+        return analyzeItem;
+    }
+
     private async getPullRequestsForCategory(categoryLabel: string): Promise<vscode.TreeItem[]> {
+        const gitAvailable = await isGitRepositoryAvailable(); 
+        if (!gitAvailable) {
+             return [new vscode.TreeItem("Requires an initialized Git repository.")];
+        }
+
         if (!this.octokit || !this.currentUser) return [];
 
         let searchQuery = '';
@@ -186,19 +220,21 @@ export class PrDataProvider implements vscode.TreeDataProvider<vscode.TreeItem> 
     }
 
      private async getCurrentRepoContext(): Promise<{ owner: string; repo: string } | undefined> {
+        const gitAvailable = await isGitRepositoryAvailable(); // Check first
+        if (!gitAvailable) {
+            vscode.window.showWarningMessage("Cannot get repository context: No Git repository found.");
+            return undefined;
+        }
         const folders = vscode.workspace.workspaceFolders;
         if (!folders || folders.length === 0) return undefined;
 
         const workspaceFolder = folders[0].uri; // Simplistic: assumes first folder
 
         try {
-            // This is a very basic way; a robust solution uses the Git extension API
-            // or parses .git/config manually or uses a git CLI wrapper.
             const gitConfigPath = vscode.Uri.joinPath(workspaceFolder, '.git/config');
             const configContentBytes = await vscode.workspace.fs.readFile(gitConfigPath);
             const configContent = new TextDecoder().decode(configContentBytes);
 
-            // Very basic parsing (prone to errors with complex configs)
             const remoteUrlMatch = /\[remote "origin"\]\s*url = (?:git@github\.com:|https:\/\/github\.com\/)([\w-]+)\/([\w-]+)(?:\.git)?/m.exec(configContent);
              if (remoteUrlMatch && remoteUrlMatch.length >= 3) {
                 return { owner: remoteUrlMatch[1], repo: remoteUrlMatch[2] };
@@ -211,7 +247,7 @@ export class PrDataProvider implements vscode.TreeDataProvider<vscode.TreeItem> 
      }
 }
 
-// Tree Item Classes 
+// Tree Item Classes
 
 class CategoryItem extends vscode.TreeItem {
     constructor(
@@ -224,23 +260,23 @@ class CategoryItem extends vscode.TreeItem {
     }
 }
 
-export class PullRequestItem extends vscode.TreeItem { 
+export class PullRequestItem extends vscode.TreeItem {
     public changedFiles?: ChangedFileFromApi[]; // To store fetched files
     public filesFetched: boolean = false; // Flag to check if fetched
 
     constructor(
         public readonly prInfo: PullRequestInfo,
-        
+
         // Collapsible state can be passed in, default to collapsed
         // This allows for nested PRs or categories if needed
-        public readonly collapsibleState: vscode.TreeItemCollapsibleState = vscode.TreeItemCollapsibleState.Collapsed 
+        public readonly collapsibleState: vscode.TreeItemCollapsibleState = vscode.TreeItemCollapsibleState.Collapsed
     ) {
         super(`#${prInfo.number}: ${prInfo.title}`, collapsibleState);
 
         this.description = `by ${prInfo.author}`;
-        this.tooltip = `${prInfo.title}\nAuthor: ${prInfo.author}\nClick to expand`; 
+        this.tooltip = `${prInfo.title}\nAuthor: ${prInfo.author}\nClick to expand`;
         this.contextValue = 'pullRequestItem'; // Used for context menu contributions
-        this.iconPath = new vscode.ThemeIcon('git-pull-request'); 
+        this.iconPath = new vscode.ThemeIcon('git-pull-request');
     }
 }
 
@@ -248,7 +284,7 @@ export class PullRequestItem extends vscode.TreeItem {
 class DescriptionItem extends vscode.TreeItem {
     constructor(prInfo: PullRequestInfo) {
         super("Description", vscode.TreeItemCollapsibleState.None);
-        this.iconPath = new vscode.ThemeIcon('book'); 
+        this.iconPath = new vscode.ThemeIcon('book');
         this.command = {
             command: 'yourExtension.viewPullRequest', // Command to open detail webview
             title: 'View Pull Request Details',
@@ -282,7 +318,7 @@ class ChangedFileItem extends vscode.TreeItem {
                 iconColorId = 'gitDecoration.addedResourceForeground'; // Green
                 break;
             case 'modified':
-            case 'changed': 
+            case 'changed':
                 iconColorId = 'gitDecoration.modifiedResourceForeground'; // Blue/Yellow (theme dependent)
                 break;
              case 'renamed': // Renamed often shown as modified in lists
@@ -315,7 +351,7 @@ class ChangedFileItem extends vscode.TreeItem {
         this.contextValue = 'changedFileItem';
     }
 
-    // Helper to map API status to single characters 
+    // Helper to map API status to single characters
     private mapStatus(status: string): string {
          switch (status) {
             case 'added': return 'A';
@@ -323,8 +359,8 @@ class ChangedFileItem extends vscode.TreeItem {
             case 'modified': return 'M';
             case 'renamed': return 'R';
             case 'copied': return 'C'; // Less common
-            case 'changed': return 'M'; 
-            case 'unchanged': return ''; 
+            case 'changed': return 'M';
+            case 'unchanged': return '';
             default: return '?';
         }
     }

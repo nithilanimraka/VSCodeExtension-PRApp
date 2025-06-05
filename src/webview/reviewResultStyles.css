@@ -1,0 +1,214 @@
+/* project/frontend/src/webview/reviewResultStyles.css */
+body {
+    padding: 15px 25px;
+    font-family: var(--vscode-font-family);
+    font-size: var(--vscode-font-size);
+    color: var(--vscode-editor-foreground);
+    background-color: var(--vscode-editor-background);
+}
+
+h1 {
+    margin-top: 0;
+    margin-bottom: 20px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--vscode-editorWidget-border, #444);
+    font-size: 1.5em;
+}
+
+#review-list-container {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.review-item {
+    border: 1px solid var(--vscode-editorWidget-border, #555);
+    border-radius: 4px;
+    background-color: var(--vscode-sideBar-background, #252526);
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.severity-error { border-left: 5px solid var(--vscode-errorForeground, #F44747); }
+.severity-warning { border-left: 5px solid var(--vscode-editorWarning-foreground, #CCA700); }
+.severity-info { border-left: 5px solid var(--vscode-editorInfo-foreground, #3794FF); }
+.review-item:not(.severity-error):not(.severity-warning):not(.severity-info) {
+    border-left: 5px solid var(--vscode-editorWidget-border, #555);
+}
+
+.review-file-header {
+    padding: 8px 12px;
+    font-weight: 600;
+    background-color: var(--vscode-list-hoverBackground, #2a2d2e);
+    border-bottom: 1px solid var(--vscode-editorWidget-border, #555);
+    font-family: var(--vscode-editor-font-family);
+    font-size: 0.95em;
+    color: var(--vscode-descriptionForeground);
+}
+
+/* Code Blocks Styling (Original & Suggested) */
+.review-code-segment,
+.review-suggested-code pre {
+    background-color: var(--vscode-textCodeBlock-background, #1e1e1e);
+    font-family: var(--vscode-editor-font-family);
+    font-size: var(--vscode-editor-font-size);
+    line-height: var(--vscode-editor-line-height);
+    overflow-x: auto; /* Allow horizontal scroll for long lines */
+    margin: 0; /* Reset margin for pre */
+}
+.review-code-segment {
+    border-bottom: 1px solid var(--vscode-editorWidget-border, #555);
+    padding: 8px 0; /* Padding top/bottom */
+}
+.review-suggested-code pre {
+    padding: 10px 15px;
+    border-radius: 3px;
+    border: 1px solid var(--vscode-input-border, var(--vscode-editorWidget-border));
+    margin-top: 6px; /* Space below "Suggested Code:" label */
+    position: relative; /* For copy button */
+    max-height: 300px; /* Limit suggestion height */
+    overflow-y: auto;
+}
+
+/* Style for individual lines within code blocks */
+.review-code-segment .code-line,
+.review-suggested-code .code-line { /* Apply to suggested code too if needed */
+    display: flex; /* Use flex for line number alignment */
+    white-space: pre; /* Preserve whitespace within the line content */
+    padding-left: 10px; /* Space before line numbers */
+}
+
+/* Line Number Styling */
+.line-num {
+    flex: 0 0 45px; /* Fixed width, don't grow/shrink */
+    padding-right: 10px;
+    text-align: right;
+    opacity: 0.6; /* Dimmer line numbers */
+    user-select: none; /* Prevent selection */
+    color: var(--vscode-editorLineNumber-foreground);
+}
+
+/* Line Content Styling */
+.line-content {
+    flex-grow: 1; /* Take remaining space */
+    padding-left: 10px;
+    border-left: 3px solid transparent; /* Default border, colored below */
+    /* Let highlight.js handle code coloring */
+}
+
+/* Diff Highlighting for Original Code Segment */
+.review-code-segment .line-added .line-content {
+    background-color: rgba(47, 131, 47, 0.1); /* Subtler green */
+    border-left-color: var(--vscode-gitDecoration-addedResourceForeground, #238636);
+}
+.review-code-segment .line-removed .line-content {
+    background-color: rgba(188, 76, 0, 0.1); /* Subtler red */
+    text-decoration: line-through;
+    border-left-color: var(--vscode-gitDecoration-deletedResourceForeground, #cf222e);
+    opacity: 0.7;
+}
+/* Hide irrelevant line numbers for diff */
+.review-code-segment .line-added .line-num-old,
+.review-code-segment .line-removed .line-num-new {
+    visibility: hidden;
+}
+
+
+.review-analysis {
+    padding: 12px 15px;
+    background-color: var(--vscode-editorWidget-background);
+}
+
+.review-analysis p {
+    margin-top: 0;
+    margin-bottom: 10px;
+    line-height: 1.5;
+}
+.review-analysis p:last-child { margin-bottom: 0; }
+
+.review-analysis strong {
+    font-weight: 600;
+    margin-right: 5px;
+    color: var(--vscode-descriptionForeground);
+}
+
+/* Suggested Code Container */
+.review-suggested-code {
+    margin-top: 12px;
+    position: relative; /* Needed for copy button */
+}
+.review-suggested-code strong {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 0.95em;
+    color: var(--vscode-descriptionForeground);
+}
+.review-suggested-code code { /* Target code within pre for highlight.js */
+    display: block; /* Ensure block display */
+    color: var(--vscode-editor-foreground);
+    background-color: transparent;
+}
+
+/* Copy Button */
+.copy-button {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    padding: 2px 6px;
+    font-size: 0.9em;
+    cursor: pointer;
+    border: 1px solid var(--vscode-button-secondaryBorder, transparent);
+    background-color: var(--vscode-button-secondaryBackground);
+    color: var(--vscode-button-secondaryForeground);
+    border-radius: 3px;
+    opacity: 0;
+    transition: opacity 0.2s ease-in-out, background-color 0.1s ease-in-out;
+    z-index: 10;
+}
+.review-suggested-code:hover .copy-button {
+    opacity: 0.8;
+}
+.copy-button:hover {
+     background-color: var(--vscode-button-secondaryHoverBackground);
+     opacity: 1;
+}
+.copy-button .codicon {
+    vertical-align: text-bottom;
+    margin-right: 3px;
+}
+
+/* highlight.js integration */
+/* Ensure pre and code styles don't conflict too much with hljs theme */
+pre code.hljs {
+    display: block;
+    overflow-x: auto;
+    padding: 0.5em; /* Adjust padding if needed */
+    background: transparent; /* Use parent pre's background */
+    color: var(--vscode-editor-foreground); /* Use theme foreground */
+}
+
+
+.header-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.export-button {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background-color: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
+    border: none;
+    border-radius: 2px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    margin-bottom: 1rem;
+}
+
+.export-button:hover {
+    background-color: var(--vscode-button-hoverBackground);
+}
