@@ -1,4 +1,3 @@
-// project/frontend/src/webview/createPrMain.ts
 import { ChangedFile, FromCreatePrWebviewMessage, ToCreatePrWebviewMessage, VsCodeApi } from '../types';
 
 // --- Global variables for owner/repo ---

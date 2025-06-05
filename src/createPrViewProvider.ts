@@ -1,4 +1,3 @@
-// project/frontend/src/createPrViewProvider.ts
 import * as vscode from 'vscode';
 import { getNonce } from './utils';
 import { getOctokit } from './auth';

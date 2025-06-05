@@ -1,5 +1,3 @@
-// project/frontend/src/types.ts
-
 // Define types for Git info we might need
 export interface GitInfo {
     headBranch?: string;

@@ -1,4 +1,3 @@
-/* Common Styles */
 body { font-family: var(--vscode-font-family); color: var(--vscode-editor-foreground); background-color: var(--vscode-editor-background); padding: 15px 25px; }
 #timeline-area { margin-top: 20px; }
 #loading-indicator { padding: 10px; font-style: italic; opacity: 0.8; }

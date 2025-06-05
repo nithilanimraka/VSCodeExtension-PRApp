@@ -1,4 +1,3 @@
-// project/frontend/src/webview/reviewResultMain.ts
 import type { ReviewItemData, ToReviewResultWebviewMessage, VsCodeApi } from '../types'; // Import types
 
 declare const acquireVsCodeApi: () => VsCodeApi;

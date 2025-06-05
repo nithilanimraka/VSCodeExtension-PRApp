@@ -1,4 +1,3 @@
-// project/frontend/src/extension.ts
 import * as vscode from 'vscode';
 import { getGitHubSession } from './auth';
 import { PrDataProvider, PullRequestItem, PullRequestInfo } from './prDataProvider'; // Ensure PullRequestInfo is exported/imported

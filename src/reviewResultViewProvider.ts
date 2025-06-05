@@ -1,4 +1,3 @@
-// project/frontend/src/reviewResultViewProvider.ts
 import * as vscode from 'vscode';
 import { getNonce } from './utils'; // Assuming utils.ts exists and exports getNonce
 import type { ReviewItemData } from './types'; // Import the review structure type
