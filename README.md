@@ -1,71 +1,59 @@
-# github-pr-handler README
+# 🚀 GitHub PR Handler — AI-Powered PR Reviews in VS Code
 
-This is the README for your extension "github-pr-handler". After writing up a brief description, we recommend including the following sections.
-
-## Features
-
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
-
-For example if there is an image subfolder under your extension project workspace:
-
-\!\[feature X\]\(images/feature-x.png\)
-
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
-
-## Requirements
-
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
-
-## Extension Settings
-
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
-
-For example:
-
-This extension contributes the following settings:
-
-* `myExtension.enable`: Enable/disable this extension.
-* `myExtension.thing`: Set to `blah` to do something.
-
-## Known Issues
-
-Calling out known issues can help limit users opening duplicate issues against your extension.
-
-## Release Notes
-
-Users appreciate release notes as you update your extension.
-
-### 1.0.0
-
-Initial release of ...
-
-### 1.0.1
-
-Fixed issue #.
-
-### 1.1.0
-
-Added features X, Y, and Z.
+**GitHub PR Handler** is a powerful Visual Studio Code extension that lets you **view, manage, and analyze GitHub Pull Requests (PRs)** directly within the editor. Featuring **AI-driven code reviews** and **natural language repository insights**, it brings an intelligent PR workflow to your fingertips.
 
 ---
 
-## Following extension guidelines
+## ✨ Key Features
 
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
+### 📂 Organized Pull Request Tree View
+Easily browse pull requests from the current repository in two categorized views:
+- **Waiting for My Review**
+- **Created by Me**
 
-* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
+### 🧾 Rich Pull Request Details
+Access comprehensive PR information with a clean, webview interface:
+- View commit history, comments, and review threads
+- Real-time updates similar to the GitHub web interface
 
-## Working with Markdown
+### 🤖 AI-Powered Code Review
+- Select a base and head branch
+- Automatically fetch diffs via GitHub API
+- Send to an AI backend for review
+- Get intelligent feedback with:
+  - Highlighted issues
+  - Code improvement suggestions
 
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
+### 💬 Natural Language Repository Q&A
+Ask meaningful questions like:
+> “Who contributed the most this month?”
 
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
+And receive insightful answers, powered by AI.
 
-## For more information
 
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
+## 📦 Release Notes
 
-**Enjoy!**
+### v1.1.0
+- Added GitHub webhook support
+- Integrated syntax highlighting with `highlight.js`
+- Enhanced error handling and loading feedback
+
+### v1.0.0
+- Initial release with:
+  - Pull request tree view
+  - Detailed PR webview with live polling
+  - AI-based code reviews
+  - Chat-style repository analysis
+
+## 📚 Learn More
+
+- [VS Code Markdown Support](https://code.visualstudio.com/docs/languages/markdown)
+- [GitHub Markdown Syntax Guide](https://help.github.com/articles/markdown-basics)
+- [Octokit — GitHub API SDK](https://github.com/octokit/octokit.js)
+
+---
+
+## ⚡️ Start Reviewing Smarter
+
+Empower your GitHub workflow with **AI-assisted PR handling** — all from the comfort of Visual Studio Code.
+

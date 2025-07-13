@@ -1,8 +1,14 @@
 {
   "name": "github-pr-handler",
   "displayName": "Github PR handler",
+  "publisher": "CodeCritics",
   "description": "This is a Github Pull request extension which handles and reviews PRs",
   "version": "0.0.1",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nithilanimraka/VSCodeExtension-PRApp"
+  },
   "engines": {
     "vscode": "^1.98.0"
   },
